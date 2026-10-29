@@ -17,7 +17,13 @@ import {
   updateTransaction,
 } from "@/lib/actions/transactions";
 import { installmentSchedule } from "@/lib/finance/cards";
-import { formatMoney, formatMonth, formatShortDate, parseAmount } from "@/lib/finance/format";
+import {
+  formatAmountInput,
+  formatMoney,
+  formatMonth,
+  formatShortDate,
+  parseAmount,
+} from "@/lib/finance/format";
 import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +51,7 @@ type Props = {
   onDone: () => void;
 };
 
-const amountToText = (n: number) => String(n).replace(".", ",");
+const amountToText = (n: number) => formatAmountInput(String(n).replace(".", ","));
 
 const INSTALLMENT_OPTIONS = [1, 3, 6, 9, 12, 18, 24];
 
@@ -236,28 +242,34 @@ export function TransactionForm({
         <Label htmlFor="tx-amount" className="justify-center text-muted-foreground">
           Monto
         </Label>
-        <div className="mt-1 flex items-center justify-center gap-1">
+        <div className="mt-1 flex max-w-full items-baseline justify-center gap-1 overflow-hidden">
           <span
-            className={cn("text-3xl font-semibold", isIncome ? "text-emerald-600" : "text-rose-600")}
+            className={cn("shrink-0 text-3xl font-semibold", isIncome ? "text-emerald-600" : "text-rose-600")}
             aria-hidden
           >
             {isIncome ? "+" : "−"}$
           </span>
-          <input
-            id="tx-amount"
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="0"
-            value={amountText}
-            onChange={(e) => {
-              setAmountText(e.target.value.replace(/[^\d.,]/g, ""));
-              setAmountError(false);
-            }}
-            aria-invalid={amountError}
-            autoFocus={!transaction}
-            readOnly={!!purchaseId}
-            className="w-full max-w-[14rem] bg-transparent text-center text-4xl font-semibold tabular-nums outline-none placeholder:text-muted-foreground/40"
-          />
+          {/* El texto invisible da el ancho exacto: signo y número quedan centrados juntos. */}
+          <span className="inline-grid min-w-0 text-4xl font-semibold tabular-nums">
+            <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">
+              {amountText || "0"}
+            </span>
+            <input
+              id="tx-amount"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="0"
+              value={amountText}
+              onChange={(e) => {
+                setAmountText(formatAmountInput(e.target.value));
+                setAmountError(false);
+              }}
+              aria-invalid={amountError}
+              autoFocus={!transaction}
+              readOnly={!!purchaseId}
+              className="col-start-1 row-start-1 w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/40"
+            />
+          </span>
         </div>
         {amountError && <p className="mt-1 text-sm text-destructive">Ingresa un monto mayor a 0</p>}
       </div>

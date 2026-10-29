@@ -29,6 +29,21 @@ export function parseAmount(raw: string): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 }
 
+/**
+ * Da formato a lo que se escribe en un campo de monto: puntos de miles y coma decimal
+ * ("1234567,5" → "1.234.567,5"). Un punto al final se toma como coma decimal, para
+ * teclados que solo tienen punto. Lo que devuelve lo entiende `parseAmount`.
+ */
+export function formatAmountInput(raw: string): string {
+  let s = raw.replace(/[^\d.,]/g, "");
+  if (s.endsWith(".") && !s.includes(",")) s = `${s.slice(0, -1)},`;
+  const [intRaw, ...rest] = s.split(",");
+  const int = intRaw.replace(/\./g, "").replace(/^0+(?=\d)/, "");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (!s.includes(",")) return grouped;
+  return `${grouped || "0"},${rest.join("").replace(/\./g, "").slice(0, 2)}`;
+}
+
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const utcDate = (ymd: string) => {

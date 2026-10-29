@@ -9,7 +9,7 @@ import { MonthSwitcher } from "@/components/dashboard/MonthSwitcher";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import {
   RecurringSuggestions,
-  RegisterButton,
+  QuickAddButton,
   TransactionSheetProvider,
 } from "@/components/transactions/TransactionSheet";
 import { upcomingDues } from "@/lib/finance/cards";
@@ -115,7 +115,8 @@ export function DashboardView({
                   : undefined
               }
               projection={projectMonthExpense(summary.expense, today, month)}
-              actions={<RegisterButton />}
+              incomeAction={<QuickAddButton type="income" />}
+              expenseAction={<QuickAddButton type="expense" />}
             />
             <RecurringSuggestions pending={pending} categories={categories} />
             {isCurrent && <CardsStrip cards={cards} upcoming={upcomingCardTransactions} today={today} />}

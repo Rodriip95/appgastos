@@ -9,9 +9,10 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import { Loader2, Plus, Repeat, Trash2 } from "lucide-react";
+import { Loader2, Minus, Plus, Repeat, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
+import { BALANCE_ACTIONS_ID } from "@/components/dashboard/BalanceCard";
 import { CategoryIcon } from "@/components/categories/CategoryIcon";
 import { TransactionForm, type TransactionPrefill } from "@/components/transactions/TransactionForm";
 import { deleteTransaction } from "@/lib/actions/transactions";
@@ -57,7 +58,7 @@ type ProviderProps = {
 
 /**
  * Maneja el formulario de alta/edición de movimientos para toda la vista del mes.
- * Lo abren `RegisterButton`, `ScrollAddButton`, `RecurringSuggestions` y las filas.
+ * Lo abren `QuickAddButton` (+/− del balance), `ScrollAddButton`, `RecurringSuggestions` y las filas.
  */
 export function TransactionSheetProvider({
   categories,
@@ -130,31 +131,30 @@ export function TransactionSheetProvider({
   );
 }
 
-const REGISTER_ID = "register-movement";
-
-/** Acción principal del mes: un solo botón; el tipo se elige dentro del formulario. */
-export function RegisterButton() {
+/** Botón + / − de cada total del balance: abre el alta de ese tipo. */
+export function QuickAddButton({ type }: { type: TxType }) {
   const { openNew } = useTransactionSheet();
+  const income = type === "income";
+  const Icon = income ? Plus : Minus;
   return (
     <button
-      id={REGISTER_ID}
       type="button"
-      onClick={() => openNew()}
-      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary-foreground text-sm font-semibold text-primary shadow-sm transition hover:bg-primary-foreground/90 active:scale-[0.98]"
+      onClick={() => openNew(type)}
+      aria-label={income ? "Registrar ingreso" : "Registrar gasto"}
+      className="grid size-9 shrink-0 place-items-center rounded-full bg-primary-foreground text-primary shadow-sm transition hover:bg-primary-foreground/90 active:scale-90"
     >
-      <Plus className="size-4" strokeWidth={2.5} />
-      Registrar movimiento
+      <Icon className="size-4" strokeWidth={2.75} />
     </button>
   );
 }
 
-/** Botón compacto que aparece cuando el botón principal sale de la pantalla. */
+/** Botón compacto que aparece cuando los botones del balance salen de la pantalla. */
 function ScrollAddButton() {
   const { openNew } = useTransactionSheet();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const target = document.getElementById(REGISTER_ID);
+    const target = document.getElementById(BALANCE_ACTIONS_ID);
     if (!target) return;
     const observer = new IntersectionObserver(([entry]) => setVisible(!entry.isIntersecting), {
       rootMargin: "-56px 0px 0px 0px", // descuenta el header fijo

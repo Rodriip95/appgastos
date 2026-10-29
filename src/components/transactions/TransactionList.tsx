@@ -42,9 +42,8 @@ export function TransactionList({
         </span>
         <h2 className="mt-3 font-semibold">Sin movimientos en {formatMonthShort(month)}</h2>
         <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-          Registra el primero con{" "}
-          <strong className="font-medium text-foreground">Registrar movimiento</strong>, en la tarjeta
-          de balance.
+          Registra el primero con los botones <strong className="font-medium text-foreground">+</strong>{" "}
+          y <strong className="font-medium text-foreground">−</strong> de la tarjeta de balance.
         </p>
       </section>
     );

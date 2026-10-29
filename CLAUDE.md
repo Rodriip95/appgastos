@@ -54,7 +54,7 @@ El navegador **no** accede a Firestore: `firestore.rules` bloquea todo y todo pa
 - Server Components por defecto; `"use client"` solo para interacción (formularios, sheets, nav activa, menú de usuario).
 - `components/common/ResponsiveSheet.tsx`: bottom sheet (vaul) en mobile, Dialog en desktop. Úsalo para formularios.
 - La vista del mes es `components/dashboard/DashboardView.tsx` (sin acceso a datos): la usan `(app)/page.tsx` (datos reales) y `/demo` (datos ficticios de `lib/demo/data.ts`, sin login; el proxy la excluye). Recibe también el mes anterior para comparar y detectar fijos pendientes.
-- `TransactionSheetProvider` aporta el formulario de alta/edición. Lo abren `RegisterButton` (único botón dentro de `BalanceCard`), `ScrollAddButton` (+ flotante que aparece cuando el botón principal sale de pantalla), `RecurringSuggestions` y las filas (`TransactionRow`, que además se deslizan para eliminar). Con `demo` ninguna acción se ejecuta.
+- `TransactionSheetProvider` aporta el formulario de alta/edición. Lo abren `QuickAddButton` (+ en el total de ingresos y − en el de gastos de `BalanceCard`), `ScrollAddButton` (+ flotante que aparece cuando esos totales salen de pantalla), `RecurringSuggestions` y las filas (`TransactionRow`, que además se deslizan para eliminar). Con `demo` ninguna acción se ejecuta.
 - Formulario: categorías ordenadas por uso, "Registrar de nuevo" (prefill) y la marca `recurring` (gasto fijo mensual).
 - Desglose (`Breakdown`): dona SVG, comparación con el mes anterior y link a la lista filtrada por categoría (`?c=<categoryId|none>`). `BudgetsCard` usa `category.budget` (tope mensual, solo gastos).
 - `TransactionList` es client: búsqueda local y filtro por `?c=`.

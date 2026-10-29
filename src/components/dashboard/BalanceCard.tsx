@@ -10,10 +10,16 @@ type Props = {
   previous?: { income: number; expense: number; month: string };
   /** Gasto proyectado a fin de mes (solo mes en curso) */
   projection?: number | null;
-  actions?: ReactNode;
+  /** Botón para registrar un ingreso (va en el total de ingresos) */
+  incomeAction?: ReactNode;
+  /** Botón para registrar un gasto (va en el total de gastos) */
+  expenseAction?: ReactNode;
 };
 
-export function BalanceCard({ summary, previous, projection, actions }: Props) {
+/** Id de la fila de totales: el + flotante aparece cuando sale de pantalla. */
+export const BALANCE_ACTIONS_ID = "balance-actions";
+
+export function BalanceCard({ summary, previous, projection, incomeAction, expenseAction }: Props) {
   const { income, expense, balance } = summary;
   const spentPct = income > 0 ? Math.round((expense / income) * 100) : null;
   const prevLabel = previous ? formatMonthShort(previous.month).toLowerCase() : "";
@@ -50,13 +56,14 @@ export function BalanceCard({ summary, previous, projection, actions }: Props) {
         </div>
       )}
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div id={BALANCE_ACTIONS_ID} className="mt-5 grid grid-cols-2 gap-3">
         <Stat
           label="Ingresos"
           value={income}
           tone="income"
           change={previous ? changePct(income, previous.income) : null}
           prevLabel={prevLabel}
+          action={incomeAction}
         />
         <Stat
           label="Gastos"
@@ -64,10 +71,9 @@ export function BalanceCard({ summary, previous, projection, actions }: Props) {
           tone="expense"
           change={previous ? changePct(expense, previous.expense) : null}
           prevLabel={prevLabel}
+          action={expenseAction}
         />
       </div>
-
-      {actions && <div className="mt-4">{actions}</div>}
     </section>
   );
 }
@@ -78,12 +84,14 @@ function Stat({
   tone,
   change,
   prevLabel,
+  action,
 }: {
   label: string;
   value: number;
   tone: "income" | "expense";
   change: number | null;
   prevLabel: string;
+  action?: ReactNode;
 }) {
   const Icon = tone === "income" ? ArrowDownLeft : ArrowUpRight;
   // Más ingreso es bueno; más gasto, no.
@@ -92,18 +100,21 @@ function Stat({
 
   return (
     <div className="rounded-2xl bg-primary-foreground/10 p-3">
-      <div className="flex items-center gap-2 text-xs text-primary-foreground/70">
-        <span
-          className={cn(
-            "grid size-6 place-items-center rounded-full",
-            tone === "income"
-              ? "bg-emerald-400/20 text-emerald-300 dark:text-emerald-700"
-              : "bg-rose-400/20 text-rose-300 dark:text-rose-700",
-          )}
-        >
-          <Icon className="size-3.5" />
-        </span>
-        {label}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 pt-1.5 text-xs text-primary-foreground/70">
+          <span
+            className={cn(
+              "grid size-6 place-items-center rounded-full",
+              tone === "income"
+                ? "bg-emerald-400/20 text-emerald-300 dark:text-emerald-700"
+                : "bg-rose-400/20 text-rose-300 dark:text-rose-700",
+            )}
+          >
+            <Icon className="size-3.5" />
+          </span>
+          {label}
+        </div>
+        {action}
       </div>
       <p className="mt-1.5 truncate text-lg font-semibold tabular-nums">{formatMoney(value)}</p>
       {change !== null && (

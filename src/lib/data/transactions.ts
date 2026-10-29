@@ -19,6 +19,7 @@ export function toTransaction(doc: QueryDocumentSnapshot): Transaction {
     cardId: d.cardId ?? null,
     purchaseId: d.purchaseId ?? null,
     installment: d.installment ?? null,
+    sharedSpaceId: null,
     createdAt: (d.createdAt as Timestamp | undefined)?.toMillis() ?? 0,
   };
 }

@@ -9,6 +9,7 @@ import {
   AddSettlementButton,
   DeleteEntryButton,
   SpaceSettingsButton,
+  type SummaryLink,
 } from "@/components/shared/SharedSheets";
 import { activeMembers, firstName, money, signedMoney, toneAt } from "@/components/shared/shared-ui";
 import type { SharedDetail } from "@/lib/data/shared";
@@ -17,10 +18,15 @@ import { balanceBySubcategory, computeBalance } from "@/lib/finance/shared";
 import type { Person } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
-type Props = SharedDetail & { contacts: Person[]; today: string };
+type Props = SharedDetail & {
+  contacts: Person[];
+  today: string;
+  link: SummaryLink;
+  expenseCategories: { id: string; name: string }[];
+};
 
 /** Detalle de un espacio: balance, desglose por subcategoría e historial. */
-export function SharedSpaceView({ space, entries, me, contacts, today }: Props) {
+export function SharedSpaceView({ space, entries, me, contacts, today, link, expenseCategories }: Props) {
   const members = activeMembers(space.members);
   const allUids = space.members.map((m) => m.uid);
   const balance = computeBalance(entries, allUids);
@@ -51,7 +57,13 @@ export function SharedSpaceView({ space, entries, me, contacts, today }: Props) 
         </div>
         <AddSettlementButton space={space} members={members} me={me} myNet={myNet} />
         <AddExpenseButton space={space} members={members} me={me} />
-        <SpaceSettingsButton space={space} me={me} contacts={contacts} />
+        <SpaceSettingsButton
+          space={space}
+          me={me}
+          contacts={contacts}
+          link={link}
+          expenseCategories={expenseCategories}
+        />
       </div>
 
       <BalanceBeam members={members} balance={balance} me={me} />

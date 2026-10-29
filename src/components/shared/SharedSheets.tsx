@@ -16,6 +16,7 @@ import {
   leaveSharedSpace,
   removeSharedMember,
   respondSharedInvite,
+  setSharedLink,
 } from "@/lib/actions/shared";
 import type { ActionResult, Person, SharedMember, SharedSpace } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
@@ -207,15 +208,90 @@ function ConfirmButton({
   );
 }
 
+/** Mi vínculo con el resumen personal: null = no suma. */
+export type SummaryLink = { categoryId: string | null } | null;
+
 type SettingsProps = {
   space: SharedSpace;
   me: string;
   /** Mis contactos */
   contacts: Person[];
+  link: SummaryLink;
+  /** Mis categorías de gasto, para elegir dónde cae mi parte */
+  expenseCategories: { id: string; name: string }[];
 };
 
+/** Interruptor para sumar mi parte de este espacio al resumen mensual personal. */
+function SummaryLinkSection({
+  spaceId,
+  kind,
+  link,
+  categories,
+}: {
+  spaceId: string;
+  kind: SharedSpace["kind"];
+  link: SummaryLink;
+  categories: { id: string; name: string }[];
+}) {
+  const [pending, startTransition] = useTransition();
+  const enabled = link !== null;
+  const save = (on: boolean, categoryId: string | null) =>
+    startTransition(async () => {
+      const res = await setSharedLink(spaceId, on, categoryId);
+      if (!res.ok) toast.error(res.error);
+    });
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-medium">En mi resumen</h3>
+          <p className="text-xs text-muted-foreground">
+            {kind === "goal" ? "Mis aportes cuentan como dinero apartado." : "Mi parte de cada gasto cuenta en mis gastos del mes."}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label="Sumar a mi resumen"
+          disabled={pending}
+          onClick={() => save(!enabled, link?.categoryId ?? null)}
+          className={cn(
+            "relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60",
+            enabled ? "bg-primary" : "bg-muted",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform",
+              enabled && "translate-x-5",
+            )}
+          />
+        </button>
+      </div>
+      {enabled && kind === "expenses" && (
+        <select
+          aria-label="Categoría de mi parte"
+          value={link?.categoryId ?? ""}
+          disabled={pending}
+          onChange={(e) => save(true, e.target.value || null)}
+          className="h-11 w-full rounded-lg border bg-background px-3 text-base"
+        >
+          <option value="">Sin categoría</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
+    </section>
+  );
+}
+
 /** Ajustes del espacio: datos, participantes, invitaciones y salida. */
-export function SpaceSettingsButton({ space, me, contacts }: SettingsProps) {
+export function SpaceSettingsButton({ space, me, contacts, link, expenseCategories }: SettingsProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const owner = space.createdBy === me;
@@ -240,6 +316,8 @@ export function SpaceSettingsButton({ space, me, contacts }: SettingsProps) {
       <ResponsiveSheet open={open} onOpenChange={setOpen} title="Ajustes" description={space.name}>
         <div className="flex flex-col gap-7">
           <SpaceForm space={space} contacts={contacts} onDone={() => setOpen(false)} />
+
+          <SummaryLinkSection spaceId={space.id} kind={space.kind} link={link} categories={expenseCategories} />
 
           <section className="space-y-2">
             <h3 className="text-sm font-medium">Participantes</h3>

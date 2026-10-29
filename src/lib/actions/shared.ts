@@ -361,6 +361,42 @@ export async function addSharedSettlement(input: SharedSettlementInput): Promise
   return { ok: true };
 }
 
+/**
+ * Suma (o quita) mi parte de un espacio compartido al resumen mensual personal.
+ * En gastos se elige una categoría propia (opcional); en objetivos mis aportes
+ * cuentan como dinero apartado.
+ */
+export async function setSharedLink(
+  spaceId: string,
+  enabled: boolean,
+  categoryId: string | null,
+): Promise<ActionResult> {
+  const me = await verifySession();
+  if (categoryId !== null && !idSchema.safeParse(categoryId).success) return fail("Categoría inválida");
+
+  try {
+    const found = await loadSpace(spaceId, me.uid);
+    if (!found) return fail("El espacio ya no está disponible");
+    const link = userCollection(me.uid, "sharedLinks").doc(spaceId);
+    if (!enabled) {
+      await link.delete();
+    } else {
+      let category: string | null = null;
+      if (categoryId && found.space.kind === "expenses") {
+        const doc = await userCollection(me.uid, "categories").doc(categoryId).get();
+        if (!doc.exists || doc.get("type") !== "expense") return fail("Categoría inválida");
+        category = categoryId;
+      }
+      await link.set({ categoryId: category });
+    }
+  } catch (error) {
+    console.error("[shared] link:", error);
+    return fail("No pudimos guardar el cambio");
+  }
+  refresh();
+  return { ok: true };
+}
+
 const contributionSchema = z.object({
   ...entryBase,
   kind: z.enum(["deposit", "withdrawal"]),

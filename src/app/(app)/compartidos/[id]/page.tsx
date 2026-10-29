@@ -4,8 +4,10 @@ import { io } from "next/cache";
 import { notFound } from "next/navigation";
 import { SharedSpaceView } from "@/components/shared/SharedSpaceView";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCategories } from "@/lib/data/categories";
 import { getContactsOverview } from "@/lib/data/contacts";
 import { getSharedDetail } from "@/lib/data/shared";
+import { getSharedLinks } from "@/lib/data/shared-links";
 import { todayKey } from "@/lib/finance/format";
 
 export const metadata: Metadata = { title: "Gasto compartido · Bingo" };
@@ -20,10 +22,23 @@ export default function SharedSpacePage({ params }: { params: Promise<{ id: stri
 
 async function SharedSpace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [detail, { contacts }] = await Promise.all([getSharedDetail(id, "expenses"), getContactsOverview()]);
+  const [detail, { contacts }, links, categories] = await Promise.all([
+    getSharedDetail(id, "expenses"),
+    getContactsOverview(),
+    getSharedLinks(),
+    getCategories(),
+  ]);
   if (!detail) notFound();
   await io(); // "hoy" se calcula en cada request
-  return <SharedSpaceView {...detail} contacts={contacts} today={todayKey()} />;
+  return (
+    <SharedSpaceView
+      {...detail}
+      contacts={contacts}
+      today={todayKey()}
+      link={links[id] ?? null}
+      expenseCategories={categories.filter((c) => c.type === "expense").map((c) => ({ id: c.id, name: c.name }))}
+    />
+  );
 }
 
 function SpaceSkeleton() {

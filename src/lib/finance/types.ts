@@ -35,6 +35,8 @@ export type Transaction = {
   purchaseId: string | null;
   /** Cuota n de total; null si no es una compra con tarjeta */
   installment: { n: number; total: number } | null;
+  /** Si viene de un gasto compartido (solo mi parte, no editable): id del espacio */
+  sharedSpaceId: string | null;
   createdAt: number;
 };
 

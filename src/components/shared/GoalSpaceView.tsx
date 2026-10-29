@@ -7,6 +7,7 @@ import {
   AddContributionButton,
   DeleteEntryButton,
   SpaceSettingsButton,
+  type SummaryLink,
 } from "@/components/shared/SharedSheets";
 import { activeMembers, firstName, money, toneAt } from "@/components/shared/shared-ui";
 import type { SharedDetail } from "@/lib/data/shared";
@@ -16,10 +17,15 @@ import { computeGoalProgress, fromCents, progressByConcept } from "@/lib/finance
 import type { Person } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
-type Props = SharedDetail & { contacts: Person[]; today: string };
+type Props = SharedDetail & {
+  contacts: Person[];
+  today: string;
+  link: SummaryLink;
+  expenseCategories: { id: string; name: string }[];
+};
 
 /** Detalle de un objetivo compartido: avance, aportes por persona y por concepto, historial. */
-export function GoalSpaceView({ space, entries, me, contacts, today }: Props) {
+export function GoalSpaceView({ space, entries, me, contacts, today, link, expenseCategories }: Props) {
   const members = activeMembers(space.members);
   const uids = space.members.map((m) => m.uid);
   const progress = computeGoalProgress(entries, uids);
@@ -71,7 +77,13 @@ export function GoalSpaceView({ space, entries, me, contacts, today }: Props) {
           </div>
         </div>
         <AddContributionButton space={space} members={members} me={me} saved={progress.saved} />
-        <SpaceSettingsButton space={space} me={me} contacts={contacts} />
+        <SpaceSettingsButton
+          space={space}
+          me={me}
+          contacts={contacts}
+          link={link}
+          expenseCategories={expenseCategories}
+        />
       </div>
 
       <section aria-label="Avance" className="rounded-3xl border bg-card p-5">

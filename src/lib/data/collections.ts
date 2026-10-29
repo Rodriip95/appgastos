@@ -4,7 +4,7 @@ import { getAdminDb } from "@/lib/firebase/admin";
 // Los datos personales viven bajo users/{uid}/... para aislarlos por usuario.
 export const userCollection = (
   uid: string,
-  name: "categories" | "transactions" | "cards" | "goals" | "goalMovements" | "contacts",
+  name: "categories" | "transactions" | "cards" | "goals" | "goalMovements" | "contacts" | "sharedLinks",
 ) => getAdminDb().collection("users").doc(uid).collection(name);
 
 /** Perfiles públicos mínimos (users/{uid}): permiten buscar a una persona por email. */

@@ -9,6 +9,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Minus, Plus, Repeat, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
@@ -258,11 +259,19 @@ export function TransactionRow({
   const sub = category?.subcategories.find((s) => s.id === transaction.subcategoryId);
   const income = transaction.type === "income";
   const title = transaction.note || sub?.name || category?.name || (income ? "Ingreso" : "Gasto");
-  const subtitle = [category?.name ?? "Sin categoría", transaction.note ? sub?.name : null, cuota]
+  const subtitle = [
+    category?.name ?? "Sin categoría",
+    transaction.note ? sub?.name : null,
+    cuota,
+    transaction.sharedSpaceId ? "Mi parte" : null,
+  ]
     .filter(Boolean)
     .join(" · ");
   // Las cuotas se borran como compra completa desde el formulario, no con un gesto.
-  const swipeable = !transaction.purchaseId;
+  // Lo compartido tampoco se desliza: se administra desde su espacio.
+  const sharedSpaceId = transaction.sharedSpaceId;
+  const swipeable = !transaction.purchaseId && !sharedSpaceId;
+  const router = useRouter();
 
   function handleDelete() {
     startTransition(async () => {
@@ -296,6 +305,7 @@ export function TransactionRow({
         onClick={() => {
           if (drag.current?.moved) return;
           if (offset) setOffset(0);
+          else if (sharedSpaceId) router.push(`/compartidos/${sharedSpaceId}`);
           else openEdit(transaction);
         }}
         onPointerDown={(e) => {

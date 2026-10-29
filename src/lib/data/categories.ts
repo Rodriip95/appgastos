@@ -15,6 +15,7 @@ export function toCategory(doc: DocumentSnapshot): Category {
     icon: d.icon ?? "tag",
     color: d.color ?? "slate",
     subcategories: Array.isArray(d.subcategories) ? d.subcategories : [],
+    budget: typeof d.budget === "number" && d.budget > 0 ? d.budget : null,
   };
 }
 

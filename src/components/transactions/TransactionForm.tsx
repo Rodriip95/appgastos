@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard as CreditCardIcon, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { CreditCard as CreditCardIcon, Loader2, Repeat, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +17,32 @@ import {
   updateTransaction,
 } from "@/lib/actions/transactions";
 import { installmentSchedule } from "@/lib/finance/cards";
-import { formatMoney, formatMonth, formatShortDate, parseAmount } from "@/lib/finance/format";
+import {
+  formatAmountInput,
+  formatMoney,
+  formatMonth,
+  formatShortDate,
+  parseAmount,
+} from "@/lib/finance/format";
 import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
+
+/** Valores iniciales para un alta (repetir un movimiento o registrar un fijo). */
+export type TransactionPrefill = Pick<
+  Transaction,
+  "type" | "amount" | "categoryId" | "subcategoryId" | "note" | "recurring"
+>;
 
 type Props = {
   categories: Category[];
   cards: CreditCard[];
+  /** Usos por categoría: las más usadas se muestran primero */
+  usage?: Record<string, number>;
+  /** Modo demo: no se llama a ninguna acción */
+  demo?: boolean;
+  prefill?: TransactionPrefill;
+  /** Abre un alta nueva con los datos de este movimiento */
+  onRepeat?: (transaction: Transaction) => void;
   defaultType: TxType;
   defaultDate: string;
   /** Mes que se está viendo, para avisar si el movimiento queda en otro */
@@ -32,13 +51,17 @@ type Props = {
   onDone: () => void;
 };
 
-const amountToText = (n: number) => String(n).replace(".", ",");
+const amountToText = (n: number) => formatAmountInput(String(n).replace(".", ","));
 
 const INSTALLMENT_OPTIONS = [1, 3, 6, 9, 12, 18, 24];
 
 export function TransactionForm({
   categories,
   cards,
+  usage,
+  demo = false,
+  prefill,
+  onRepeat,
   defaultType,
   defaultDate,
   viewMonth,
@@ -46,19 +69,24 @@ export function TransactionForm({
   onDone,
 }: Props) {
   const router = useRouter();
-  const [type, setType] = useState<TxType>(transaction?.type ?? defaultType);
-  const [amountText, setAmountText] = useState(transaction ? amountToText(transaction.amount) : "");
-  const [categoryId, setCategoryId] = useState<string | null>(transaction?.categoryId ?? null);
-  const [subcategoryId, setSubcategoryId] = useState<string | null>(transaction?.subcategoryId ?? null);
+  const initial = transaction ?? prefill;
+  const [type, setType] = useState<TxType>(initial?.type ?? defaultType);
+  const [amountText, setAmountText] = useState(initial ? amountToText(initial.amount) : "");
+  const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
+  const [subcategoryId, setSubcategoryId] = useState<string | null>(initial?.subcategoryId ?? null);
   const [date, setDate] = useState(transaction?.date ?? defaultDate);
-  const [note, setNote] = useState(transaction?.note ?? "");
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [recurring, setRecurring] = useState(initial?.recurring ?? false);
   const [cardId, setCardId] = useState<string | null>(transaction?.cardId ?? null);
   const [installments, setInstallments] = useState(1);
   const [amountError, setAmountError] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const options = categories.filter((c) => c.type === type);
+  // Las más usadas primero; a igual uso, orden alfabético (el que ya traen).
+  const options = categories
+    .filter((c) => c.type === type)
+    .sort((a, b) => (usage?.[b.id] ?? 0) - (usage?.[a.id] ?? 0));
   const selected = options.find((c) => c.id === categoryId);
   const isIncome = type === "income";
   // Una cuota de tarjeta se edita como compra: solo categoría y descripción.
@@ -81,8 +109,20 @@ export function TransactionForm({
     setSubcategoryId(null);
   }
 
+  function demoGuard(): boolean {
+    if (!demo) return false;
+    toast.info("Modo demo: los cambios no se guardan");
+    onDone();
+    return true;
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!purchaseId && !parseAmount(amountText)) {
+      setAmountError(true);
+      return;
+    }
+    if (demoGuard()) return;
     if (purchaseId) {
       startTransition(async () => {
         const res = await updateCardPurchase(purchaseId, { categoryId, subcategoryId, note });
@@ -131,7 +171,7 @@ export function TransactionForm({
     }
 
     startTransition(async () => {
-      const input = { type, amount, date, categoryId, subcategoryId, note };
+      const input = { type, amount, date, categoryId, subcategoryId, note, recurring };
       const res = transaction
         ? await updateTransaction(transaction.id, input)
         : await createTransaction(input);
@@ -159,6 +199,7 @@ export function TransactionForm({
       setConfirmDelete(true);
       return;
     }
+    if (demoGuard()) return;
     startTransition(async () => {
       const res = purchaseId
         ? await deleteCardPurchase(purchaseId)
@@ -201,27 +242,34 @@ export function TransactionForm({
         <Label htmlFor="tx-amount" className="justify-center text-muted-foreground">
           Monto
         </Label>
-        <div className="mt-1 flex items-center justify-center gap-1">
+        <div className="mt-1 flex max-w-full items-baseline justify-center gap-1 overflow-hidden">
           <span
-            className={cn("text-3xl font-semibold", isIncome ? "text-emerald-600" : "text-rose-600")}
+            className={cn("shrink-0 text-3xl font-semibold", isIncome ? "text-emerald-600" : "text-rose-600")}
             aria-hidden
           >
             {isIncome ? "+" : "−"}$
           </span>
-          <input
-            id="tx-amount"
-            inputMode="decimal"
-            autoComplete="off"
-            placeholder="0"
-            value={amountText}
-            onChange={(e) => {
-              setAmountText(e.target.value.replace(/[^\d.,]/g, ""));
-              setAmountError(false);
-            }}
-            aria-invalid={amountError}
-            readOnly={!!purchaseId}
-            className="w-full max-w-[14rem] bg-transparent text-center text-4xl font-semibold tabular-nums outline-none placeholder:text-muted-foreground/40"
-          />
+          {/* El texto invisible da el ancho exacto: signo y número quedan centrados juntos. */}
+          <span className="inline-grid min-w-0 text-4xl font-semibold tabular-nums">
+            <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">
+              {amountText || "0"}
+            </span>
+            <input
+              id="tx-amount"
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder="0"
+              value={amountText}
+              onChange={(e) => {
+                setAmountText(formatAmountInput(e.target.value));
+                setAmountError(false);
+              }}
+              aria-invalid={amountError}
+              autoFocus={!transaction}
+              readOnly={!!purchaseId}
+              className="col-start-1 row-start-1 w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/40"
+            />
+          </span>
         </div>
         {amountError && <p className="mt-1 text-sm text-destructive">Ingresa un monto mayor a 0</p>}
       </div>
@@ -386,6 +434,24 @@ export function TransactionForm({
         </div>
       </div>
 
+      {!card && !purchaseId && (
+        <label className="flex cursor-pointer items-center gap-3 rounded-2xl border p-3">
+          <Repeat className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Es fijo todos los meses</span>
+            <span className="block text-xs text-muted-foreground">
+              Te lo recordamos el mes que viene para registrarlo con un toque.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={recurring}
+            onChange={(e) => setRecurring(e.target.checked)}
+            className="size-5 accent-foreground"
+          />
+        </label>
+      )}
+
       <div className="flex flex-col gap-2">
         <Button
           type="submit"
@@ -405,6 +471,17 @@ export function TransactionForm({
                 ? "Registrar compra"
                 : "Registrar gasto"}
         </Button>
+        {transaction && !purchaseId && onRepeat && (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            onClick={() => onRepeat(transaction)}
+            disabled={pending}
+          >
+            <Repeat /> Registrar de nuevo
+          </Button>
+        )}
         {transaction && (
           <Button
             type="button"

@@ -1,6 +1,6 @@
 import type { Category } from "@/lib/finance/types";
 
-type DefaultCategory = Omit<Category, "id" | "subcategories"> & { subcategories: string[] };
+type DefaultCategory = Omit<Category, "id" | "subcategories" | "budget"> & { subcategories: string[] };
 
 // Categorías sugeridas que el usuario puede importar con un toque.
 export const DEFAULT_CATEGORIES: DefaultCategory[] = [

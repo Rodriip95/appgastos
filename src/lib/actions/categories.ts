@@ -14,6 +14,7 @@ const categorySchema = z.object({
   type: z.enum(["income", "expense"]),
   name: z.string().trim().min(1, "Ponle un nombre a la categoría").max(40, "Nombre muy largo"),
   description: z.string().trim().max(160, "Descripción muy larga").default(""),
+  budget: z.number().positive("El presupuesto debe ser mayor a 0").max(1e12).nullable().default(null),
   icon: z.enum(ICON_KEYS),
   color: z.enum(COLOR_KEYS),
   subcategories: z
@@ -47,7 +48,9 @@ export async function saveCategory(input: CategoryInput, id?: string): Promise<A
     })
     .map((s) => ({ id: s.id || randomUUID(), name: s.name }));
 
-  const data = { ...parsed.data, subcategories };
+  // El presupuesto solo aplica a categorías de gasto.
+  const budget = parsed.data.type === "expense" ? parsed.data.budget : null;
+  const data = { ...parsed.data, budget, subcategories };
   const col = userCollection(uid, "categories");
 
   try {

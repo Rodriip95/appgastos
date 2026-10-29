@@ -12,6 +12,8 @@ export type Category = {
   icon: IconKey;
   color: ColorKey;
   subcategories: Subcategory[];
+  /** Tope mensual de gasto (solo categorías de gasto); null = sin presupuesto */
+  budget: number | null;
 };
 
 export type Transaction = {
@@ -25,6 +27,8 @@ export type Transaction = {
   categoryId: string | null;
   subcategoryId: string | null;
   note: string;
+  /** Gasto/ingreso fijo: se propone registrarlo cada mes */
+  recurring: boolean;
   /** Tarjeta con la que se pagó (solo gastos) */
   cardId: string | null;
   /** Compra en cuotas a la que pertenece; todas sus cuotas comparten este id */

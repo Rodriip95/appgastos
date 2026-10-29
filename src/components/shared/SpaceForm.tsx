@@ -331,20 +331,35 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone
         >
           <Plus /> Agregar
         </Button>
-        {!space && subs.length === 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {SUGGESTED_SUBS[kind].map((n) => (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {SUGGESTED_SUBS[kind].map((n) => {
+            const on = subs.some((s) => s.name.trim().toLowerCase() === n.toLowerCase());
+            return (
               <button
                 key={n}
                 type="button"
-                onClick={() => setSubs((list) => [...list, { name: n }])}
-                className="rounded-full border px-3 py-1 text-xs text-muted-foreground transition hover:bg-muted"
+                aria-pressed={on}
+                onClick={() =>
+                  setSubs((list) =>
+                    on
+                      ? list.filter((s) => s.name.trim().toLowerCase() !== n.toLowerCase())
+                      : // Usa el primer renglón vacío antes de sumar otro.
+                        list.some((s) => !s.name.trim())
+                        ? list.map((s, i, all) => (i === all.findIndex((x) => !x.name.trim()) ? { ...s, name: n } : s))
+                        : [...list, { name: n }],
+                  )
+                }
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition",
+                  on ? "border-transparent bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                )}
               >
-                + {n}
+                {on && <Check className="size-3" />}
+                {n}
               </button>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
       </fieldset>
 
       {!space && (

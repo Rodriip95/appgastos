@@ -1,8 +1,5 @@
-import Link from "next/link";
-import { Sparkles } from "lucide-react";
-import { BingoGreeting } from "@/components/brand/BingoGreeting";
+import { BingoAssistant } from "@/components/brand/BingoAssistant";
 import { CardsStrip } from "@/components/cards/CardsStrip";
-import { DueReminders } from "@/components/cards/DueReminders";
 import { BalanceCard } from "@/components/dashboard/BalanceCard";
 import { Breakdown } from "@/components/dashboard/Breakdown";
 import { BudgetsCard } from "@/components/dashboard/BudgetsCard";
@@ -14,6 +11,7 @@ import {
   QuickAddButton,
   TransactionSheetProvider,
 } from "@/components/transactions/TransactionSheet";
+import { bingoMessages } from "@/lib/finance/bingo";
 import { upcomingDues } from "@/lib/finance/cards";
 import { netSaved } from "@/lib/finance/goals";
 import { shiftMonth } from "@/lib/finance/format";
@@ -69,6 +67,22 @@ export function DashboardView({
   const dues = upcomingDues(cards, upcomingCardTransactions, today);
   const pending = isCurrent ? pendingRecurring(prevTransactions, transactions) : [];
   const usage = categoryUsage([...prevTransactions, ...transactions]);
+  const projection = projectMonthExpense(summary.expense, today, month);
+  const assistant = isCurrent
+    ? bingoMessages({
+        today,
+        month,
+        summary,
+        prevSummary,
+        hasPrev: prevTransactions.length > 0,
+        projection,
+        categories,
+        transactions,
+        dues,
+        pendingRecurring: pending,
+        goals,
+      })
+    : [];
 
   const monthQuery = month === currentMonth ? "" : `m=${month}`;
   const hrefWith = (params: string) => {
@@ -85,27 +99,13 @@ export function DashboardView({
       usage={usage}
     >
       <main className="space-y-5">
-        {isCurrent && <BingoGreeting balance={summary.balance} hasMovements={transactions.length > 0} />}
-        {isCurrent && <DueReminders dues={dues} />}
+        {assistant.length > 0 && <BingoAssistant messages={assistant} />}
 
         <MonthSwitcher
           month={month}
           currentMonth={currentMonth}
           firstMonth={firstMonth}
         />
-
-        {categories.length === 0 && (
-          <Link
-            href="/categorias"
-            className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 transition hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
-          >
-            <Sparkles className="size-5 shrink-0" />
-            <span>
-              <strong className="font-semibold">Configura tus categorías</strong> para saber en qué se va
-              tu plata. Puedes empezar con las sugeridas.
-            </span>
-          </Link>
-        )}
 
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:items-start">
           <div className="space-y-5">
@@ -116,7 +116,7 @@ export function DashboardView({
                   ? { income: prevSummary.income, expense: prevSummary.expense, month: shiftMonth(month, -1) }
                   : undefined
               }
-              projection={projectMonthExpense(summary.expense, today, month)}
+              projection={projection}
               saved={netSaved(goalMovements)}
               incomeAction={<QuickAddButton type="income" />}
               expenseAction={<QuickAddButton type="expense" />}

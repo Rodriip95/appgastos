@@ -27,7 +27,7 @@ Copiar `.env.example` a `.env.local` y completar las variables `NEXT_PUBLIC_FIRE
 ## Arquitectura
 
 ### Autenticación (Google + cookie de sesión)
-Flujo: el cliente hace `signInWithPopup` (`components/auth/GoogleSignInButton.tsx`) → manda el ID token a la Server Action `createSession` (`lib/auth/actions.ts`) → el servidor lo verifica con firebase-admin y guarda una cookie httpOnly `session` (5 días). La sesión vive en la cookie, no en el SDK cliente (persistencia `inMemory`).
+Flujo: el cliente hace `signInWithPopup` (`components/auth/GoogleSignInButton.tsx`) → manda el ID token a la Server Action `createSession` (`lib/auth/actions.ts`) → el servidor lo verifica con firebase-admin y guarda una cookie httpOnly `session` (5 días). La sesión vive en la cookie, no en el SDK cliente (el SDK cliente cierra su sesión tras crear la cookie; el popup se abre sin `await` previos para que mobile no lo bloquee).
 
 - `lib/firebase/client.ts`: SDK cliente (`auth`, `db`). Solo para componentes `"use client"`.
 - `lib/firebase/admin.ts`: SDK admin, `server-only`, init perezoso vía `getAdminAuth()` (el build no requiere credenciales; el runtime sí: `FIREBASE_CLIENT_EMAIL`/`FIREBASE_PRIVATE_KEY`).

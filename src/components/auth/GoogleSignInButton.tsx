@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  GoogleAuthProvider,
-  inMemoryPersistence,
-  setPersistence,
-  signInWithPopup,
-} from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { createSession } from "@/lib/auth/actions";
 
@@ -20,16 +15,24 @@ export function GoogleSignInButton() {
     setLoading(true);
     setError(null);
     try {
-      // La sesión vive en la cookie del servidor, no en el SDK cliente
-      await setPersistence(auth, inMemoryPersistence);
+      // El popup debe abrirse sin ningún `await` antes: los navegadores móviles
+      // lo bloquean si se pierde el vínculo con el toque del usuario.
       const { user } = await signInWithPopup(auth, new GoogleAuthProvider());
       const { ok } = await createSession(await user.getIdToken());
+      // La sesión vive en la cookie del servidor, no en el SDK cliente.
+      await signOut(auth);
       if (!ok) throw new Error("session");
       router.replace("/");
       router.refresh();
     } catch (e) {
-      const closed = (e as { code?: string }).code === "auth/popup-closed-by-user";
-      setError(closed ? null : "No pudimos iniciar sesión. Inténtalo de nuevo.");
+      const code = (e as { code?: string }).code;
+      setError(
+        code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request"
+          ? null
+          : code === "auth/popup-blocked"
+            ? "Tu navegador bloqueó la ventana de Google. Permite las ventanas emergentes para este sitio e inténtalo de nuevo."
+            : "No pudimos iniciar sesión. Inténtalo de nuevo.",
+      );
       setLoading(false);
     }
   }

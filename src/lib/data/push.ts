@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { after } from "next/server";
 import { userCollection } from "@/lib/data/collections";
+import { touch } from "@/lib/data/live";
 import { getAdminMessaging } from "@/lib/firebase/admin";
 
 export type PushPayload = {
@@ -43,7 +44,9 @@ export async function sendPush(uids: string[], payload: PushPayload): Promise<vo
   );
 }
 
-/** Avisa sin demorar la respuesta de la acción. */
+/** Avisa (push) y refresca en vivo a otros usuarios, sin demorar la respuesta de la acción. */
 export function notify(uids: string[], payload: PushPayload): void {
-  if (uids.length > 0) after(() => sendPush(uids, payload));
+  if (uids.length === 0) return;
+  touch(uids);
+  after(() => sendPush(uids, payload));
 }

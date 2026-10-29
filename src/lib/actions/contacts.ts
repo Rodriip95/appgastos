@@ -6,6 +6,7 @@ import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { contactRequestsCollection, DOC_ID_RE, userCollection } from "@/lib/data/collections";
 import { findProfileByEmail, toPerson, upsertProfile } from "@/lib/data/profiles";
+import { touch } from "@/lib/data/live";
 import { notify } from "@/lib/data/push";
 import type { ActionResult } from "@/lib/finance/types";
 
@@ -101,7 +102,7 @@ export async function respondContactRequest(id: string, accept: boolean): Promis
       if (!snap.exists || snap.get("toUid") !== me.uid || snap.get("status") !== "pending") {
         return "La solicitud ya no está disponible";
       }
-      if (accept) requester = snap.get("fromUid");
+      requester = snap.get("fromUid");
       const fromUid: string = snap.get("fromUid");
       if (!accept) {
         tx.update(ref, { status: "rejected", respondedAt: FieldValue.serverTimestamp() });
@@ -126,7 +127,8 @@ export async function respondContactRequest(id: string, accept: boolean): Promis
       return null;
     });
     if (error) return fail(error);
-    if (requester) {
+    if (requester && !accept) touch([requester]);
+    if (requester && accept) {
       notify([requester], {
         title: "Contacto agregado",
         body: `${me.name ?? me.email ?? "Alguien"} aceptó tu solicitud`,
@@ -151,6 +153,7 @@ export async function cancelContactRequest(id: string): Promise<ActionResult> {
     const snap = await ref.get();
     if (snap.exists && snap.get("fromUid") === me.uid && snap.get("status") === "pending") {
       await ref.delete();
+      touch([snap.get("toUid")]);
     }
   } catch (error) {
     console.error("[contacts] cancel:", error);
@@ -173,6 +176,7 @@ export async function removeContact(otherUid: string): Promise<ActionResult> {
     batch.delete(requests.doc(requestId(me.uid, otherUid)));
     batch.delete(requests.doc(requestId(otherUid, me.uid)));
     await batch.commit();
+    touch([otherUid]);
   } catch (error) {
     console.error("[contacts] remove:", error);
     return fail("No pudimos eliminar el contacto");

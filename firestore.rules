@@ -1,10 +1,17 @@
 rules_version = '2';
 
 // Toda lectura/escritura pasa por el servidor (firebase-admin en Server
-// Components y Server Actions), que ignora estas reglas. El SDK cliente no
-// accede a Firestore, así que se bloquea todo acceso directo desde el navegador.
+// Components y Server Actions), que ignora estas reglas. El navegador no lee
+// datos: se bloquea todo acceso directo salvo la señal de tiempo real (abajo).
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Única excepción: cada usuario puede LEER su propio documento de señales en
+    // tiempo real (lo escribe solo el servidor). Los datos nunca se leen desde el navegador.
+    match /liveSignals/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

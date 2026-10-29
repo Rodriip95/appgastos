@@ -6,7 +6,9 @@ import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { verifySession, type SessionUser } from "@/lib/auth/session";
 import { DOC_ID_RE, sharedCollection, userCollection } from "@/lib/data/collections";
+import { touch } from "@/lib/data/live";
 import { notify } from "@/lib/data/push";
+import { exitSpace, othersIn } from "@/lib/data/shared-write";
 import { toSpace } from "@/lib/data/shared";
 import { COLOR_KEYS, ICON_KEYS } from "@/lib/finance/catalog";
 import { formatMoney } from "@/lib/finance/format";
@@ -169,6 +171,7 @@ export async function updateSharedSpace(id: string, input: SpaceInput): Promise<
     if (goal?.error) return fail(goal.error);
     // Las subcategorías quitadas dejan sus movimientos como "Sin subcategoría".
     await found.ref.update({ ...parsed.data, subcategories: cleaned.subs, ...(goal && { goal: goal.goal }) });
+    touch(othersIn(found.space, me.uid).map((m) => m.uid));
   } catch (error) {
     console.error("[shared] update:", error);
     return fail("No pudimos guardar los cambios");
@@ -223,6 +226,7 @@ export async function respondSharedInvite(id: string, accept: boolean): Promise<
         memberIds: FieldValue.arrayRemove(me.uid),
         [`members.${me.uid}`]: FieldValue.delete(),
       });
+      touch(othersIn(found.space, me.uid).map((m) => m.uid));
     }
   } catch (error) {
     console.error("[shared] respond:", error);
@@ -243,16 +247,7 @@ export async function leaveSharedSpace(id: string): Promise<ActionResult> {
   try {
     const found = await loadSpace(id, me.uid);
     if (!found) return fail("El espacio ya no está disponible");
-    const othersActive = found.space.members.some((m) => m.uid !== me.uid && m.status === "accepted");
-    const othersPending = found.space.members.some((m) => m.uid !== me.uid && m.status === "pending");
-    if (!othersActive && !othersPending) {
-      await deleteSpaceTree(found.ref);
-    } else {
-      await found.ref.update({
-        memberIds: FieldValue.arrayRemove(me.uid),
-        [`members.${me.uid}.status`]: "left",
-      });
-    }
+    touch(await exitSpace(found.ref, found.space, me.uid));
   } catch (error) {
     console.error("[shared] leave:", error);
     return fail("No pudimos salir del espacio");
@@ -277,6 +272,7 @@ export async function removeSharedMember(id: string, uid: string): Promise<Actio
       [`members.${uid}`]:
         target.status === "pending" ? FieldValue.delete() : { ...target, status: "left" },
     });
+    touch([uid, ...othersIn(found.space, me.uid).map((m) => m.uid)]);
   } catch (error) {
     console.error("[shared] remove member:", error);
     return fail("No pudimos quitar a la persona");
@@ -291,6 +287,7 @@ export async function deleteSharedSpace(id: string): Promise<ActionResult> {
     const found = await loadSpace(id, me.uid);
     if (!found || found.space.createdBy !== me.uid) return fail("Solo quien creó el espacio puede eliminarlo");
     await deleteSpaceTree(found.ref);
+    touch(othersIn(found.space, me.uid).map((m) => m.uid));
   } catch (error) {
     console.error("[shared] delete:", error);
     return fail("No pudimos eliminar el espacio");
@@ -508,6 +505,7 @@ export async function deleteSharedEntry(spaceId: string, entryId: string): Promi
       return fail("Hay retiros que dependen de este aporte");
     }
     await ref.delete();
+    touch(othersIn(found.space, me.uid).map((m) => m.uid));
   } catch (error) {
     console.error("[shared] delete entry:", error);
     return fail("No pudimos eliminar el movimiento");

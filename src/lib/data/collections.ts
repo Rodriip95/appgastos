@@ -13,6 +13,9 @@ export const profilesCollection = () => getAdminDb().collection("users");
 /** Solicitudes de contacto entre dos usuarios (id determinístico `${fromUid}_${toUid}`). */
 export const contactRequestsCollection = () => getAdminDb().collection("contactRequests");
 
+/** Señales de tiempo real por usuario (liveSignals/{uid}); solo las escribe el servidor. */
+export const liveSignalsCollection = () => getAdminDb().collection("liveSignals");
+
 /** Espacios compartidos (shared/{id}) con sus movimientos en la subcolección `entries`. */
 export const sharedCollection = () => getAdminDb().collection("shared");
 

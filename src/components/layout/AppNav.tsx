@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, LayoutGrid, Menu, Shapes, Wallet, X } from "lucide-react";
+import { CreditCard, LayoutGrid, Menu, PiggyBank, Shapes, Wallet, X } from "lucide-react";
 import {
   Drawer,
   DrawerClose,
@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { href: "/", label: "Resumen", hint: "Balance y movimientos del mes", icon: LayoutGrid },
   { href: "/tarjetas", label: "Tarjetas", hint: "Cuotas y vencimientos", icon: CreditCard },
+  { href: "/ahorros", label: "Ahorros", hint: "Metas y dinero reservado", icon: PiggyBank },
   { href: "/categorias", label: "Categorías", hint: "Organiza tus movimientos", icon: Shapes },
 ] as const;
 

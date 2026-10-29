@@ -90,7 +90,7 @@ export function projectMonthExpense(expense: number, today: string, month: strin
   if (day < 3 || expense <= 0) return null;
   const [y, m] = month.split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  return round2((expense / day) * daysInMonth);
+  return Math.round((expense / day) * daysInMonth);
 }
 
 /** Veces que se usó cada categoría, para ordenar las más frecuentes primero. */

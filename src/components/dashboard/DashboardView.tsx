@@ -6,6 +6,7 @@ import { BalanceCard } from "@/components/dashboard/BalanceCard";
 import { Breakdown } from "@/components/dashboard/Breakdown";
 import { BudgetsCard } from "@/components/dashboard/BudgetsCard";
 import { MonthSwitcher } from "@/components/dashboard/MonthSwitcher";
+import { GoalsStrip } from "@/components/goals/GoalsStrip";
 import { TransactionList } from "@/components/transactions/TransactionList";
 import {
   RecurringSuggestions,
@@ -13,6 +14,7 @@ import {
   TransactionSheetProvider,
 } from "@/components/transactions/TransactionSheet";
 import { upcomingDues } from "@/lib/finance/cards";
+import { netSaved } from "@/lib/finance/goals";
 import { shiftMonth } from "@/lib/finance/format";
 import {
   categoryUsage,
@@ -20,7 +22,7 @@ import {
   projectMonthExpense,
   summarizeMonth,
 } from "@/lib/finance/summary";
-import type { Category, CreditCard, Transaction } from "@/lib/finance/types";
+import type { Category, CreditCard, Goal, GoalMovement, Transaction } from "@/lib/finance/types";
 
 export type DashboardData = {
   categories: Category[];
@@ -32,6 +34,9 @@ export type DashboardData = {
   /** Cuotas de tarjeta desde el mes en curso en adelante */
   upcomingCardTransactions: Transaction[];
   firstMonth: string | null;
+  goals: Goal[];
+  /** Aportes y retiros de metas en el mes que se ve */
+  goalMovements: GoalMovement[];
 };
 
 type Props = DashboardData & {
@@ -53,6 +58,8 @@ export function DashboardView({
   prevTransactions,
   upcomingCardTransactions,
   firstMonth,
+  goals,
+  goalMovements,
   month,
   currentMonth,
   today,
@@ -115,11 +122,13 @@ export function DashboardView({
                   : undefined
               }
               projection={projectMonthExpense(summary.expense, today, month)}
+              saved={netSaved(goalMovements)}
               incomeAction={<QuickAddButton type="income" />}
               expenseAction={<QuickAddButton type="expense" />}
             />
             <RecurringSuggestions pending={pending} categories={categories} />
             {isCurrent && <CardsStrip cards={cards} upcoming={upcomingCardTransactions} today={today} />}
+            {isCurrent && <GoalsStrip goals={goals} href={`${basePath === "/" ? "" : basePath}/ahorros`} />}
             <BudgetsCard categories={categories} summary={summary} />
             {transactions.length > 0 && (
               <Breakdown summary={summary} filterHref={(key) => `${hrefWith(`c=${key}`)}#movimientos`} />

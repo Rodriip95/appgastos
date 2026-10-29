@@ -3,7 +3,15 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard as CreditCardIcon, Loader2, Repeat, Sparkles, Trash2 } from "lucide-react";
+import {
+  ChevronUp,
+  CreditCard as CreditCardIcon,
+  Loader2,
+  MoreHorizontal,
+  Repeat,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +96,17 @@ export function TransactionForm({
     .filter((c) => c.type === type)
     .sort((a, b) => (usage?.[b.id] ?? 0) - (usage?.[a.id] ?? 0));
   const selected = options.find((c) => c.id === categoryId);
+  // Solo las más usadas a la vista; si la elegida quedó fuera, se muestra igual.
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const VISIBLE_CATEGORIES = 7;
+  const visibleOptions =
+    showAllCategories || options.length <= VISIBLE_CATEGORIES + 1
+      ? options
+      : [
+          ...options.slice(0, VISIBLE_CATEGORIES),
+          ...(selected && !options.slice(0, VISIBLE_CATEGORIES).includes(selected) ? [selected] : []),
+        ];
+  const hiddenCount = options.length - visibleOptions.length;
   const isIncome = type === "income";
   // Una cuota de tarjeta se edita como compra: solo categoría y descripción.
   const purchaseId = transaction?.purchaseId ?? null;
@@ -360,7 +379,7 @@ export function TransactionForm({
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-            {options.map((c) => {
+            {visibleOptions.map((c) => {
               const active = c.id === categoryId;
               return (
                 <button
@@ -378,6 +397,21 @@ export function TransactionForm({
                 </button>
               );
             })}
+            {(hiddenCount > 0 || showAllCategories) && options.length > VISIBLE_CATEGORIES + 1 && (
+              <button
+                type="button"
+                onClick={() => setShowAllCategories((v) => !v)}
+                aria-expanded={showAllCategories}
+                className="flex flex-col items-center gap-1.5 rounded-2xl border border-transparent p-2 text-muted-foreground transition hover:bg-muted/60 active:scale-95"
+              >
+                <span className="grid size-10 place-items-center rounded-xl border border-dashed">
+                  {showAllCategories ? <ChevronUp className="size-5" /> : <MoreHorizontal className="size-5" />}
+                </span>
+                <span className="text-center text-[11px] leading-tight">
+                  {showAllCategories ? "Menos" : `${hiddenCount} más`}
+                </span>
+              </button>
+            )}
           </div>
         )}
 

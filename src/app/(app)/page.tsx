@@ -5,6 +5,7 @@ import { DashboardView } from "@/components/dashboard/DashboardView";
 import { verifySession } from "@/lib/auth/session";
 import { getCards } from "@/lib/data/cards";
 import { getCategories } from "@/lib/data/categories";
+import { getGoals, getMonthGoalMovements } from "@/lib/data/goals";
 import {
   getFirstActivityMonth,
   getMonthTransactions,
@@ -30,15 +31,25 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
   // Solo meses pasados o el actual; cualquier otro valor cae al mes actual.
   const month = isMonthKey(m) && m <= currentMonth ? m : currentMonth;
 
-  const [categories, cards, transactions, prevTransactions, firstMonth, upcomingCardTransactions] =
-    await Promise.all([
-      getCategories(),
-      getCards(),
-      getMonthTransactions(month),
-      getMonthTransactions(shiftMonth(month, -1)),
-      getFirstActivityMonth(),
-      getUpcomingCardTransactions(currentMonth),
-    ]);
+  const [
+    categories,
+    cards,
+    transactions,
+    prevTransactions,
+    firstMonth,
+    upcomingCardTransactions,
+    goals,
+    goalMovements,
+  ] = await Promise.all([
+    getCategories(),
+    getCards(),
+    getMonthTransactions(month),
+    getMonthTransactions(shiftMonth(month, -1)),
+    getFirstActivityMonth(),
+    getUpcomingCardTransactions(currentMonth),
+    getGoals(),
+    getMonthGoalMovements(month),
+  ]);
 
   return (
     <DashboardView
@@ -48,6 +59,8 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       prevTransactions={prevTransactions}
       upcomingCardTransactions={upcomingCardTransactions}
       firstMonth={firstMonth}
+      goals={goals}
+      goalMovements={goalMovements}
       month={month}
       currentMonth={currentMonth}
       today={today}

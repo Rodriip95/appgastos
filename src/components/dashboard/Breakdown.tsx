@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChartPie, ChevronDown, ListFilter, TrendingDown, TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CollapsibleList } from "@/components/common/CollapsibleList";
 import { CATEGORY_COLORS, CategoryIcon } from "@/components/categories/CategoryIcon";
 import type { ColorKey } from "@/lib/finance/catalog";
 import { formatMoney } from "@/lib/finance/format";
@@ -120,7 +121,11 @@ function Rows({
   return (
     <div className="space-y-2">
       <Donut rows={rows} total={total} type={type} />
-      <ul className="divide-y">
+      <CollapsibleList
+        limit={5}
+        className="divide-y"
+        noun="categorías"
+      >
         {rows.map((row) => {
           const color = row.category?.color ?? "slate";
           const change = changePct(row.total, row.prevTotal);
@@ -190,7 +195,7 @@ function Rows({
             </li>
           );
         })}
-      </ul>
+      </CollapsibleList>
     </div>
   );
 }

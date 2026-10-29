@@ -1,7 +1,7 @@
 import { installmentSchedule } from "@/lib/finance/cards";
 import { DEFAULT_CATEGORIES } from "@/lib/finance/defaults";
 import { shiftMonth } from "@/lib/finance/format";
-import type { Category, CreditCard, Transaction } from "@/lib/finance/types";
+import type { Category, CreditCard, Goal, GoalMovement, Transaction } from "@/lib/finance/types";
 
 // Datos ficticios para /demo: permiten ver la UX completa sin login ni Firestore.
 // Son deterministas (sin Math.random) para que servidor y cliente coincidan.
@@ -176,4 +176,102 @@ export function buildDemoData(month: string, today: string): DemoData {
     upcomingCardTransactions: installments.filter((t) => t.month >= currentMonth),
     firstMonth,
   };
+}
+
+// ---- Metas de ahorro ----
+
+type GoalSeed = Omit<Goal, "saved"> & {
+  /** Aporte mensual fijo (día del mes y monto) */
+  monthly: { day: number; amount: number };
+  extras: { monthsAgo: number; day: number; amount: number; note: string }[];
+};
+
+const goalSeeds = (currentMonth: string): GoalSeed[] => [
+  {
+    id: "fondo",
+    name: "Fondo de emergencia",
+    target: 3_000_000,
+    targetDate: null,
+    icon: "piggy-bank",
+    color: "emerald",
+    monthly: { day: 2, amount: 150_000 },
+    extras: [
+      { monthsAgo: 5, day: 1, amount: 430_000, note: "Lo que ya tenía guardado" },
+      { monthsAgo: 2, day: 18, amount: -80_000, note: "Arreglo del lavarropas" },
+    ],
+  },
+  {
+    id: "vacaciones",
+    name: "Vacaciones en Bariloche",
+    target: 1_800_000,
+    targetDate: `${shiftMonth(currentMonth, 8)}-15`,
+    icon: "plane",
+    color: "sky",
+    monthly: { day: 3, amount: 110_000 },
+    extras: [{ monthsAgo: 4, day: 20, amount: 90_000, note: "Parte del aguinaldo" }],
+  },
+  {
+    id: "auto",
+    name: "Auto nuevo",
+    target: 12_000_000,
+    targetDate: `${shiftMonth(currentMonth, 26)}-01`,
+    icon: "car",
+    color: "blue",
+    monthly: { day: 5, amount: 200_000 },
+    extras: [],
+  },
+  {
+    id: "notebook",
+    name: "Notebook nueva",
+    target: 750_000,
+    targetDate: `${shiftMonth(currentMonth, -1)}-28`,
+    icon: "laptop",
+    color: "violet",
+    monthly: { day: 10, amount: 150_000 },
+    extras: [],
+  },
+];
+
+/** Metas con su historial de aportes de los últimos 6 meses. */
+export function buildDemoGoals(today: string): { goals: Goal[]; movements: GoalMovement[] } {
+  const currentMonth = today.slice(0, 7);
+  const todayDay = Number(today.slice(8, 10));
+  const movements: GoalMovement[] = [];
+
+  for (const seed of goalSeeds(currentMonth)) {
+    for (let ago = 5; ago >= 0; ago--) {
+      const month = shiftMonth(currentMonth, -ago);
+      const entries = [
+        { day: seed.monthly.day, amount: seed.monthly.amount, note: "" },
+        ...seed.extras.filter((e) => e.monthsAgo === ago),
+      ];
+      for (const e of entries) {
+        if (ago === 0 && e.day > todayDay) continue;
+        // La notebook se completó: no se aporta más que el objetivo.
+        if (seed.id === "notebook" && ago < 1) continue;
+        const date = `${month}-${String(e.day).padStart(2, "0")}`;
+        movements.push({
+          id: `demo-goal-${seed.id}-${ago}-${e.day}`,
+          goalId: seed.id,
+          amount: e.amount,
+          date,
+          month,
+          note: e.note,
+          createdAt: e.day,
+        });
+      }
+    }
+  }
+
+  const goals: Goal[] = goalSeeds(currentMonth).map((g) => ({
+    id: g.id,
+    name: g.name,
+    target: g.target,
+    targetDate: g.targetDate,
+    icon: g.icon,
+    color: g.color,
+    saved: movements.filter((m) => m.goalId === g.id).reduce((sum, m) => sum + m.amount, 0),
+  }));
+  movements.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+  return { goals, movements };
 }

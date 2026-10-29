@@ -37,7 +37,7 @@ Flujo: el cliente hace `signInWithPopup` (`components/auth/GoogleSignInButton.ts
 ### Rutas y renderizado
 `next.config.ts` tiene `cacheComponents` y `partialPrefetching`: acceder a `cookies()`/datos de runtime fuera de `<Suspense>` rompe el build. Patrón usado: shell estático + componente async con la sesión envuelto en `<Suspense>` (ver `components/layout/Header.tsx`, `(app)/page.tsx`).
 - `src/app/(auth)/login`: pública.
-- `src/app/(app)/`: rutas protegidas. `/` es el resumen del mes (`?m=YYYY-MM` para meses pasados; solo se puede ir hasta el primer mes con movimientos y nunca a meses futuros). `/categorias` es el panel de categorías. `/tarjetas` es el panel de tarjetas y cuotas. `/ahorros` es la página de metas (`GoalsView`, también en `/demo/ahorros`). Los layouts no se re-renderizan al navegar, por eso la auth se verifica en cada página, no en el layout.
+- `src/app/(app)/`: rutas protegidas. `/` es el resumen del mes (`?m=YYYY-MM` para meses pasados; solo se puede ir hasta el primer mes con movimientos y nunca a meses futuros). `/categorias` es el panel de categorías. `/tarjetas` es el panel de tarjetas y cuotas. `/ahorros` es la página de metas (`GoalsView`). Los layouts no se re-renderizan al navegar, por eso la auth se verifica en cada página, no en el layout.
 - Para calcular "hoy" en el servidor hay que llamar `await io()` (de `next/cache`) antes; si no, `cacheComponents` falla por valor inestable.
 
 ### Datos (Firestore)
@@ -54,8 +54,8 @@ El navegador **no** accede a Firestore: `firestore.rules` bloquea todo y todo pa
 ### UI
 - Server Components por defecto; `"use client"` solo para interacción (formularios, sheets, nav activa, menú de usuario).
 - `components/common/ResponsiveSheet.tsx`: bottom sheet (vaul) en mobile, Dialog en desktop. Úsalo para formularios.
-- La vista del mes es `components/dashboard/DashboardView.tsx` (sin acceso a datos): la usan `(app)/page.tsx` (datos reales) y `/demo` (datos ficticios de `lib/demo/data.ts`, sin login; el proxy la excluye). Recibe también el mes anterior para comparar y detectar fijos pendientes.
-- `TransactionSheetProvider` aporta el formulario de alta/edición. Lo abren `QuickAddButton` (+ en el total de ingresos y − en el de gastos de `BalanceCard`), `ScrollAddButton` (+ flotante que aparece cuando esos totales salen de pantalla), `RecurringSuggestions` y las filas (`TransactionRow`, que además se deslizan para eliminar). Con `demo` ninguna acción se ejecuta.
+- La vista del mes es `components/dashboard/DashboardView.tsx` (solo presentación; `(app)/page.tsx` trae los datos). Recibe también el mes anterior para comparar y detectar fijos pendientes.
+- `TransactionSheetProvider` aporta el formulario de alta/edición. Lo abren `QuickAddButton` (+ en el total de ingresos y − en el de gastos de `BalanceCard`), `ScrollAddButton` (+ flotante que aparece cuando esos totales salen de pantalla), `RecurringSuggestions` y las filas (`TransactionRow`, que además se deslizan para eliminar).
 - Formulario: categorías ordenadas por uso, "Registrar de nuevo" (prefill) y la marca `recurring` (gasto fijo mensual).
 - Desglose (`Breakdown`): dona SVG, comparación con el mes anterior y link a la lista filtrada por categoría (`?c=<categoryId|none>`). `BudgetsCard` usa `category.budget` (tope mensual, solo gastos).
 - `TransactionList` es client: búsqueda local, filtro por `?c=` y días cargados de a 7.

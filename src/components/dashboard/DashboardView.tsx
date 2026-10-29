@@ -45,12 +45,9 @@ type Props = DashboardData & {
   today: string;
   /** Categoría por la que se filtra la lista (?c=) */
   filterKey: string | null;
-  /** "/" en la app, "/demo" en el modo demo */
-  basePath: string;
-  demo?: boolean;
 };
 
-/** Vista del mes. Sin acceso a datos: la usan la home real y /demo. */
+/** Vista del mes. Solo presentación: los datos llegan de `(app)/page.tsx`. */
 export function DashboardView({
   categories,
   cards,
@@ -64,8 +61,6 @@ export function DashboardView({
   currentMonth,
   today,
   filterKey,
-  basePath,
-  demo = false,
 }: Props) {
   const summary = summarizeMonth(transactions, categories, prevTransactions);
   const prevSummary = summarizeMonth(prevTransactions, categories);
@@ -77,7 +72,7 @@ export function DashboardView({
   const monthQuery = month === currentMonth ? "" : `m=${month}`;
   const hrefWith = (params: string) => {
     const query = [monthQuery, params].filter(Boolean).join("&");
-    return `${basePath}${query ? `?${query}` : ""}`;
+    return `/${query ? `?${query}` : ""}`;
   };
 
   return (
@@ -87,7 +82,6 @@ export function DashboardView({
       month={month}
       currentMonth={currentMonth}
       usage={usage}
-      demo={demo}
     >
       <main className="space-y-5">
         {isCurrent && <DueReminders dues={dues} />}
@@ -96,7 +90,6 @@ export function DashboardView({
           month={month}
           currentMonth={currentMonth}
           firstMonth={firstMonth}
-          basePath={basePath}
         />
 
         {categories.length === 0 && (
@@ -128,7 +121,7 @@ export function DashboardView({
             />
             <RecurringSuggestions pending={pending} categories={categories} />
             {isCurrent && <CardsStrip cards={cards} upcoming={upcomingCardTransactions} today={today} />}
-            {isCurrent && <GoalsStrip goals={goals} href={`${basePath === "/" ? "" : basePath}/ahorros`} />}
+            {isCurrent && <GoalsStrip goals={goals} href="/ahorros" />}
             <BudgetsCard categories={categories} summary={summary} />
             {transactions.length > 0 && (
               <Breakdown summary={summary} filterHref={(key) => `${hrefWith(`c=${key}`)}#movimientos`} />

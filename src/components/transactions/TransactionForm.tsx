@@ -46,8 +46,6 @@ type Props = {
   cards: CreditCard[];
   /** Usos por categoría: las más usadas se muestran primero */
   usage?: Record<string, number>;
-  /** Modo demo: no se llama a ninguna acción */
-  demo?: boolean;
   prefill?: TransactionPrefill;
   /** Abre un alta nueva con los datos de este movimiento */
   onRepeat?: (transaction: Transaction) => void;
@@ -67,7 +65,6 @@ export function TransactionForm({
   categories,
   cards,
   usage,
-  demo = false,
   prefill,
   onRepeat,
   defaultType,
@@ -128,12 +125,6 @@ export function TransactionForm({
     setSubcategoryId(null);
   }
 
-  function demoGuard(): boolean {
-    if (!demo) return false;
-    toast.info("Modo demo: los cambios no se guardan");
-    onDone();
-    return true;
-  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,7 +132,6 @@ export function TransactionForm({
       setAmountError(true);
       return;
     }
-    if (demoGuard()) return;
     if (purchaseId) {
       startTransition(async () => {
         const res = await updateCardPurchase(purchaseId, { categoryId, subcategoryId, note });
@@ -218,7 +208,6 @@ export function TransactionForm({
       setConfirmDelete(true);
       return;
     }
-    if (demoGuard()) return;
     startTransition(async () => {
       const res = purchaseId
         ? await deleteCardPurchase(purchaseId)

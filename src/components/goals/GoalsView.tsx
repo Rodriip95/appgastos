@@ -17,11 +17,10 @@ type Props = {
   /** Últimos aportes y retiros de todas las metas */
   movements: GoalMovement[];
   today: string;
-  demo?: boolean;
 };
 
-/** Página de ahorros y metas. Sin acceso a datos: la usan /ahorros y /demo/ahorros. */
-export function GoalsView({ goals, movements, today, demo = false }: Props) {
+/** Página de ahorros y metas. Solo presentación: los datos llegan de `(app)/ahorros/page.tsx`. */
+export function GoalsView({ goals, movements, today }: Props) {
   const totalSaved = goals.reduce((sum, g) => sum + g.saved, 0);
   const totalTarget = goals.reduce((sum, g) => sum + g.target, 0);
   const currentMonth = today.slice(0, 7);
@@ -39,7 +38,7 @@ export function GoalsView({ goals, movements, today, demo = false }: Props) {
             Aparta dinero para lo que quieres lograr y mira cuánto te falta.
           </p>
         </div>
-        {goals.length > 0 && <NewGoalButton demo={demo} />}
+        {goals.length > 0 && <NewGoalButton />}
       </div>
 
       {goals.length === 0 ? (
@@ -52,8 +51,8 @@ export function GoalsView({ goals, movements, today, demo = false }: Props) {
             Un fondo de emergencia, un viaje o un auto: define cuánto y para cuándo, y te decimos cuánto
             apartar cada mes.
           </p>
-          <SuggestedGoals demo={demo} />
-          <NewGoalButton demo={demo} variant="outline" className="mt-4 h-11" />
+          <SuggestedGoals />
+          <NewGoalButton variant="outline" className="mt-4 h-11" />
         </div>
       ) : (
         <>
@@ -92,7 +91,7 @@ export function GoalsView({ goals, movements, today, demo = false }: Props) {
 
           <div className="grid gap-4 md:grid-cols-2">
             {ordered.map((goal) => (
-              <GoalCard key={goal.id} goal={goal} today={today} demo={demo} />
+              <GoalCard key={goal.id} goal={goal} today={today} />
             ))}
           </div>
 
@@ -138,7 +137,7 @@ export function GoalsView({ goals, movements, today, demo = false }: Props) {
                         {deposit ? "+" : "−"}
                         {formatMoney(Math.abs(m.amount))}
                       </span>
-                      <UndoMovementButton id={m.id} demo={demo} />
+                      <UndoMovementButton id={m.id} />
                     </li>
                   );
                 })}

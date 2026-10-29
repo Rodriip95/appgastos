@@ -30,7 +30,6 @@ type SheetState = {
 
 type Ctx = {
   cards: CreditCard[];
-  demo: boolean;
   openNew: (type?: TxType, prefill?: TransactionPrefill) => void;
   openEdit: (transaction: Transaction) => void;
 };
@@ -51,8 +50,6 @@ type ProviderProps = {
   currentMonth: string;
   /** Usos por categoría, para mostrar primero las más frecuentes */
   usage?: Record<string, number>;
-  /** Modo demo: nada se guarda */
-  demo?: boolean;
   children: ReactNode;
 };
 
@@ -66,14 +63,12 @@ export function TransactionSheetProvider({
   month,
   currentMonth,
   usage,
-  demo = false,
   children,
 }: ProviderProps) {
   const [state, setState] = useState<SheetState>({ open: false, type: "expense", key: 0 });
 
   const ctx: Ctx = {
     cards,
-    demo,
     openNew: (type = "expense", prefill) =>
       setState((s) => ({ open: true, type: prefill?.type ?? type, prefill, key: s.key + 1 })),
     openEdit: (transaction) =>
@@ -103,7 +98,6 @@ export function TransactionSheetProvider({
           categories={categories}
           cards={cards}
           usage={usage}
-          demo={demo}
           defaultType={state.type}
           defaultDate={defaultDate}
           viewMonth={month}
@@ -249,7 +243,7 @@ export function TransactionRow({
   transaction: Transaction;
   category: Category | null;
 }) {
-  const { cards, demo, openEdit } = useTransactionSheet();
+  const { cards, openEdit } = useTransactionSheet();
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -271,11 +265,6 @@ export function TransactionRow({
   const swipeable = !transaction.purchaseId;
 
   function handleDelete() {
-    if (demo) {
-      toast.info("Modo demo: los cambios no se guardan");
-      setOffset(0);
-      return;
-    }
     startTransition(async () => {
       const res = await deleteTransaction(transaction.id);
       if (!res.ok) {

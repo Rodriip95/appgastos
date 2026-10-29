@@ -35,22 +35,14 @@ const GOAL_ICONS: IconKey[] = [
 
 const amountText = (n: number) => formatAmountInput(String(n).replace(".", ","));
 
-function demoGuard(demo: boolean, onDone: () => void) {
-  if (!demo) return false;
-  toast.info("Modo demo: los cambios no se guardan");
-  onDone();
-  return true;
-}
-
 type GoalFormProps = {
   goal?: Goal;
   /** Valores iniciales al crear desde una sugerencia */
   preset?: Pick<Goal, "name" | "icon" | "color">;
-  demo?: boolean;
   onDone: () => void;
 };
 
-export function GoalForm({ goal, preset, demo = false, onDone }: GoalFormProps) {
+export function GoalForm({ goal, preset, onDone }: GoalFormProps) {
   const initial = goal ?? preset;
   const [name, setName] = useState(initial?.name ?? "");
   const [target, setTarget] = useState(goal ? amountText(goal.target) : "");
@@ -67,7 +59,6 @@ export function GoalForm({ goal, preset, demo = false, onDone }: GoalFormProps) 
       toast.error("Ingresa el monto que quieres juntar");
       return;
     }
-    if (demoGuard(demo, onDone)) return;
     startTransition(async () => {
       const res = await saveGoal({ name, target: amount, targetDate: targetDate || null, icon, color }, goal?.id);
       if (!res.ok) {
@@ -85,7 +76,6 @@ export function GoalForm({ goal, preset, demo = false, onDone }: GoalFormProps) 
       setConfirmDelete(true);
       return;
     }
-    if (demoGuard(demo, onDone)) return;
     startTransition(async () => {
       const res = await deleteGoal(goal.id);
       if (!res.ok) {
@@ -229,12 +219,11 @@ export function GoalForm({ goal, preset, demo = false, onDone }: GoalFormProps) 
 type MovementFormProps = {
   goal: Goal;
   kind: "deposit" | "withdraw";
-  demo?: boolean;
   onDone: () => void;
 };
 
 /** Aportar dinero a una meta o retirarlo. */
-export function GoalMovementForm({ goal, kind: initialKind, demo = false, onDone }: MovementFormProps) {
+export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFormProps) {
   const [kind, setKind] = useState(initialKind);
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayKey());
@@ -253,7 +242,6 @@ export function GoalMovementForm({ goal, kind: initialKind, demo = false, onDone
       toast.error(`Solo hay ${formatMoney(goal.saved)} reservados en esta meta`);
       return;
     }
-    if (demoGuard(demo, onDone)) return;
     startTransition(async () => {
       const res = await addGoalMovement({ goalId: goal.id, kind, amount: value, date, note });
       if (!res.ok) {

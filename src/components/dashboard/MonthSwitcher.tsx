@@ -8,14 +8,12 @@ type Props = {
   currentMonth: string;
   /** Primer mes con movimientos; null si no hay ninguno */
   firstMonth: string | null;
-  /** Ruta base de los links ("/" o "/demo") */
-  basePath?: string;
 };
 
-const hrefFor = (month: string, currentMonth: string, basePath: string) =>
-  month === currentMonth ? basePath : `${basePath}?m=${month}`;
+const hrefFor = (month: string, currentMonth: string) =>
+  month === currentMonth ? "/" : `/?m=${month}`;
 
-export function MonthSwitcher({ month, currentMonth, firstMonth, basePath = "/" }: Props) {
+export function MonthSwitcher({ month, currentMonth, firstMonth }: Props) {
   const prev = shiftMonth(month, -1);
   const next = shiftMonth(month, 1);
   const canPrev = firstMonth !== null && prev >= firstMonth;
@@ -25,7 +23,7 @@ export function MonthSwitcher({ month, currentMonth, firstMonth, basePath = "/" 
   return (
     <div className="space-y-2">
       <nav aria-label="Cambiar mes" className="flex items-center justify-between gap-2">
-        <ArrowLink href={hrefFor(prev, currentMonth, basePath)} enabled={canPrev} label="Mes anterior">
+        <ArrowLink href={hrefFor(prev, currentMonth)} enabled={canPrev} label="Mes anterior">
           <ChevronLeft />
         </ArrowLink>
         <div className="text-center">
@@ -34,14 +32,14 @@ export function MonthSwitcher({ month, currentMonth, firstMonth, basePath = "/" 
           </p>
           <h1 className="text-xl font-semibold tracking-tight">{formatMonth(month)}</h1>
         </div>
-        <ArrowLink href={hrefFor(next, currentMonth, basePath)} enabled={canNext} label="Mes siguiente">
+        <ArrowLink href={hrefFor(next, currentMonth)} enabled={canNext} label="Mes siguiente">
           <ChevronRight />
         </ArrowLink>
       </nav>
       {!isCurrent && (
         <div className="flex justify-center">
           <Link
-            href={basePath}
+            href="/"
             className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
           >
             <RotateCcw className="size-3" /> Volver a {formatMonthShort(currentMonth)}

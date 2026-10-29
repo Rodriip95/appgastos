@@ -65,7 +65,6 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       currentMonth={currentMonth}
       today={today}
       filterKey={typeof c === "string" ? c : null}
-      basePath="/"
     />
   );
 }

@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 type SheetMode = { kind: "edit" } | { kind: "move"; move: "deposit" | "withdraw" } | null;
 
 /** Tarjeta de una meta: avance, cuánto apartar por mes y botones Aportar / Retirar. */
-export function GoalCard({ goal, today, demo = false }: { goal: Goal; today: string; demo?: boolean }) {
+export function GoalCard({ goal, today }: { goal: Goal; today: string }) {
   const [mode, setMode] = useState<SheetMode>(null);
   const pct = goalPct(goal);
   const plan = goalPlan(goal, today);
@@ -94,9 +94,9 @@ export function GoalCard({ goal, today, demo = false }: { goal: Goal; today: str
         onOpenChange={(open) => !open && setMode(null)}
         title={mode?.kind === "edit" ? "Editar meta" : mode?.move === "withdraw" ? "Retirar de la meta" : "Aportar a la meta"}
       >
-        {mode?.kind === "edit" && <GoalForm goal={goal} demo={demo} onDone={() => setMode(null)} />}
+        {mode?.kind === "edit" && <GoalForm goal={goal} onDone={() => setMode(null)} />}
         {mode?.kind === "move" && (
-          <GoalMovementForm goal={goal} kind={mode.move} demo={demo} onDone={() => setMode(null)} />
+          <GoalMovementForm goal={goal} kind={mode.move} onDone={() => setMode(null)} />
         )}
       </ResponsiveSheet>
     </section>
@@ -105,11 +105,9 @@ export function GoalCard({ goal, today, demo = false }: { goal: Goal; today: str
 
 /** Botón "Nueva meta"; con `preset` crea a partir de una sugerencia. */
 export function NewGoalButton({
-  demo = false,
   className,
   variant = "default",
 }: {
-  demo?: boolean;
   className?: string;
   variant?: "default" | "outline";
 }) {
@@ -125,14 +123,14 @@ export function NewGoalButton({
         title="Nueva meta"
         description="Ponle un monto y, si quieres, una fecha: te decimos cuánto apartar por mes."
       >
-        <GoalForm demo={demo} onDone={() => setOpen(false)} />
+        <GoalForm onDone={() => setOpen(false)} />
       </ResponsiveSheet>
     </>
   );
 }
 
 /** Sugerencias para crear la primera meta con un toque. */
-export function SuggestedGoals({ demo = false }: { demo?: boolean }) {
+export function SuggestedGoals() {
   const [preset, setPreset] = useState<(typeof SUGGESTED_GOALS)[number] | null>(null);
   return (
     <>
@@ -150,14 +148,14 @@ export function SuggestedGoals({ demo = false }: { demo?: boolean }) {
         ))}
       </div>
       <ResponsiveSheet open={preset !== null} onOpenChange={(o) => !o && setPreset(null)} title="Nueva meta">
-        {preset && <GoalForm key={preset.name} preset={preset} demo={demo} onDone={() => setPreset(null)} />}
+        {preset && <GoalForm key={preset.name} preset={preset} onDone={() => setPreset(null)} />}
       </ResponsiveSheet>
     </>
   );
 }
 
 /** Deshacer un aporte o retiro del historial. */
-export function UndoMovementButton({ id, demo = false }: { id: string; demo?: boolean }) {
+export function UndoMovementButton({ id }: { id: string }) {
   const [pending, startTransition] = useTransition();
   return (
     <button
@@ -165,10 +163,6 @@ export function UndoMovementButton({ id, demo = false }: { id: string; demo?: bo
       aria-label="Deshacer movimiento"
       disabled={pending}
       onClick={() => {
-        if (demo) {
-          toast.info("Modo demo: los cambios no se guardan");
-          return;
-        }
         startTransition(async () => {
           const res = await deleteGoalMovement(id);
           if (res.ok) toast.success("Movimiento deshecho");

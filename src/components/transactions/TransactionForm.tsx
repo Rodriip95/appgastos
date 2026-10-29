@@ -128,10 +128,6 @@ export function TransactionForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!purchaseId && !parseAmount(amountText)) {
-      setAmountError(true);
-      return;
-    }
     if (purchaseId) {
       startTransition(async () => {
         const res = await updateCardPurchase(purchaseId, { categoryId, subcategoryId, note });

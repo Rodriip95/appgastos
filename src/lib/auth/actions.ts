@@ -25,7 +25,7 @@ export async function createSession(idToken: string): Promise<{ ok: boolean }> {
     });
     return { ok: true };
   } catch (error) {
-    console.error("[auth] createSession falló:", error);
+    console.error("[auth] createSession:", error);
     return { ok: false };
   }
 }

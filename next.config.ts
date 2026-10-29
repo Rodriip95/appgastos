@@ -17,7 +17,9 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     rules: {
-      "*.css": {
+      // Only the Tailwind entrypoint needs this loader. Applying it to
+      // *.module.css turns CSS Modules into global CSS and drops their exports.
+      "globals.css": {
         loaders: ["@tailwindcss/turbopack"],
         as: "*.css",
       },

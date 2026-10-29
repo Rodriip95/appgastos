@@ -29,7 +29,7 @@ Copiar `.env.example` a `.env.local` y completar las variables `NEXT_PUBLIC_FIRE
 ### Autenticación (Google + cookie de sesión)
 Flujo: el cliente hace `signInWithPopup` (`components/auth/GoogleSignInButton.tsx`) → manda el ID token a la Server Action `createSession` (`lib/auth/actions.ts`) → el servidor lo verifica con firebase-admin y guarda una cookie httpOnly `session` (5 días). La sesión vive en la cookie, no en el SDK cliente (el SDK cliente cierra su sesión tras crear la cookie; el popup se abre sin `await` previos para que mobile no lo bloquee).
 
-- `lib/firebase/client.ts`: SDK cliente (`auth`, `db`). Solo para componentes `"use client"`.
+- `lib/firebase/client.ts`: SDK cliente, solo `auth` (Firestore se usa únicamente desde el servidor). Solo para componentes `"use client"`.
 - `lib/firebase/admin.ts`: SDK admin, `server-only`, init perezoso vía `getAdminAuth()` (el build no requiere credenciales; el runtime sí: `FIREBASE_CLIENT_EMAIL`/`FIREBASE_PRIVATE_KEY`).
 - `lib/auth/session.ts`: DAL. `getSessionUser()` (devuelve null) y `verifySession()` (redirige a `/login`). Usar `verifySession()` en cada página/acción protegida y, más adelante, antes de leer/escribir datos del usuario.
 - `proxy.ts` (reemplaza a `middleware` en Next 16): solo chequeo optimista de presencia de cookie para redirigir a `/login`. `/login` queda excluido a propósito (evita bucle con cookie inválida); esa página redirige a `/` si la sesión es válida.
@@ -68,7 +68,7 @@ El navegador **no** accede a Firestore: `firestore.rules` bloquea todo y todo pa
 - Paleta en `src/app/globals.css`: blanco cálido (`--background`), marrón rojizo como `--primary` (#9c3b22) y naranja como `--brand-orange` (#f28c28, clase `bg-brand-orange`/`text-brand-orange`). En oscuro el primario pasa a ser el naranja. Verde/rojo quedan solo para ingreso/gasto.
 - Ilustraciones en `components/brand/Bingo.tsx` (SVG inline, sin el pan): `BingoDog` (`variant="hello"` en el login, `"wallet"` con la billetera en la home vía `BingoGreeting`), `BingoMark` (cabeza: header, menú, ícono) y `BingoWordmark` (logotipo).
 - Tipografía del logotipo: Fredoka (Google Fonts, `font-brand`), letras con rebote y borde marrón. La fuente de Bluey es propietaria; Fredoka es la alternativa libre más parecida.
-- Exportes estáticos en `public/brand/*.svg` e ícono PWA en `public/icon.svg`.
+- Exportes estáticos en `public/brand/*.svg` e ícono PWA en `public/icon.svg`; se regeneran desde los componentes con `npm run brand:export`.
 
 ## Next.js
 

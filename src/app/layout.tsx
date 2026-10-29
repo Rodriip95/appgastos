@@ -9,7 +9,7 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-// Tipografía redondeada y gruesa para el logotipo "Bingo"
+// Tipografía redondeada para los títulos; el logotipo usa lettering vectorial propio.
 const fredoka = Fredoka({
   variable: "--font-fredoka",
   subsets: ["latin"],
@@ -23,6 +23,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Bingo",
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
   description: "Bingo cuida tu billetera: registra ingresos y gastos, arma presupuestos y ahorra para tus metas",
 };
 

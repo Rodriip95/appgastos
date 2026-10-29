@@ -14,6 +14,7 @@ import {
 } from "@/components/categories/CategoryIcon";
 import { deleteCategory, saveCategory } from "@/lib/actions/categories";
 import { COLOR_KEYS, ICON_KEYS, type ColorKey, type IconKey } from "@/lib/finance/catalog";
+import { parseAmount } from "@/lib/finance/format";
 import type { Category, Subcategory, TxType } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,9 @@ type Props = {
 export function CategoryForm({ type, category, onDone }: Props) {
   const [name, setName] = useState(category?.name ?? "");
   const [description, setDescription] = useState(category?.description ?? "");
+  const [budgetText, setBudgetText] = useState(
+    category?.budget ? String(category.budget).replace(".", ",") : "",
+  );
   const [icon, setIcon] = useState<IconKey>(category?.icon ?? "tag");
   const [color, setColor] = useState<ColorKey>(category?.color ?? (type === "income" ? "emerald" : "sky"));
   const [subs, setSubs] = useState<Subcategory[]>(category?.subcategories ?? []);
@@ -48,7 +52,15 @@ export function CategoryForm({ type, category, onDone }: Props) {
     e.preventDefault();
     startTransition(async () => {
       const res = await saveCategory(
-        { type, name, description, icon, color, subcategories: subs },
+        {
+          type,
+          name,
+          description,
+          icon,
+          color,
+          subcategories: subs,
+          budget: type === "expense" ? parseAmount(budgetText) : null,
+        },
         category?.id,
       );
       if (!res.ok) {
@@ -111,6 +123,29 @@ export function CategoryForm({ type, category, onDone }: Props) {
           className="text-base"
         />
       </div>
+
+      {type === "expense" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="cat-budget">
+            Presupuesto mensual <span className="font-normal text-muted-foreground">(opcional)</span>
+          </Label>
+          <div className="relative">
+            <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
+              $
+            </span>
+            <Input
+              id="cat-budget"
+              inputMode="decimal"
+              autoComplete="off"
+              value={budgetText}
+              onChange={(e) => setBudgetText(e.target.value.replace(/[^\d.,]/g, ""))}
+              placeholder="Sin tope"
+              className="h-11 pl-7 text-base tabular-nums"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">Te avisamos al llegar al 80% y si te pasas.</p>
+        </div>
+      )}
 
       {/* Subcategorías */}
       <fieldset className="space-y-2">

@@ -15,6 +15,7 @@ export function toTransaction(doc: QueryDocumentSnapshot): Transaction {
     categoryId: d.categoryId ?? null,
     subcategoryId: d.subcategoryId ?? null,
     note: d.note ?? "",
+    recurring: d.recurring === true,
     cardId: d.cardId ?? null,
     purchaseId: d.purchaseId ?? null,
     installment: d.installment ?? null,

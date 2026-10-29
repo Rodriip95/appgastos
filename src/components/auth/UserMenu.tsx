@@ -15,6 +15,7 @@ import {
 import { auth } from "@/lib/firebase/client";
 import { destroySession } from "@/lib/auth/actions";
 import type { SessionUser } from "@/lib/auth/session";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 function useSignOut() {
@@ -91,6 +92,10 @@ export function UserMenu({ user }: { user: SessionUser }) {
           <p className="truncate text-sm font-medium text-foreground">{user.name ?? "Mi cuenta"}</p>
           {user.email && <p className="truncate text-xs text-muted-foreground">{user.email}</p>}
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="p-1">
+          <ThemeToggle />
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(e) => {

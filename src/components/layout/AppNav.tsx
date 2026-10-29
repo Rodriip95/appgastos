@@ -11,6 +11,7 @@ import {
   DrawerDescription,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -118,6 +119,9 @@ export function SideMenu({ footer }: { footer?: ReactNode }) {
               })}
             </nav>
 
+            <div className="px-3 pb-3">
+              <ThemeToggle />
+            </div>
             {footer && <div className="border-t p-3">{footer}</div>}
           </div>
         </DrawerContent>

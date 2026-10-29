@@ -17,6 +17,7 @@ const transactionSchema = z.object({
   categoryId: z.string().regex(DOC_ID_RE).nullable(),
   subcategoryId: z.string().max(64).nullable(),
   note: z.string().trim().max(120, "Descripción muy larga").default(""),
+  recurring: z.boolean().default(false),
 });
 
 export type TransactionInput = z.input<typeof transactionSchema>;

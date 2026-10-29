@@ -13,5 +13,8 @@ export const profilesCollection = () => getAdminDb().collection("users");
 /** Solicitudes de contacto entre dos usuarios (id determinístico `${fromUid}_${toUid}`). */
 export const contactRequestsCollection = () => getAdminDb().collection("contactRequests");
 
+/** Espacios compartidos (shared/{id}) con sus movimientos en la subcolección `entries`. */
+export const sharedCollection = () => getAdminDb().collection("shared");
+
 /** IDs de documentos válidos (evita rutas arbitrarias desde el cliente). */
 export const DOC_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;

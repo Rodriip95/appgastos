@@ -98,4 +98,46 @@ export type ContactRequest = {
   createdAt: number;
 };
 
-export type ActionResult ={ ok: true } | { ok: false; error: string };
+export type SharedMemberStatus = "pending" | "accepted" | "left";
+
+export type SharedMember = Person & { status: SharedMemberStatus };
+
+/** Espacio compartido entre contactos (hoy: gastos compartidos, p. ej. un auto). */
+export type SharedSpace = {
+  id: string;
+  kind: "expenses";
+  name: string;
+  icon: IconKey;
+  color: ColorKey;
+  /** Quien lo creó (puede quitar miembros y eliminarlo) */
+  createdBy: string;
+  /** Todos los que alguna vez participaron; el historial conserva a quienes se fueron */
+  members: SharedMember[];
+  /** Subcategorías propias del espacio (nafta, service, seguro…) */
+  subcategories: Subcategory[];
+};
+
+/**
+ * Movimiento de un espacio de gastos. Los montos van en centavos enteros para que
+ * los repartos no acumulen errores de redondeo.
+ * - expense: `paidBy` pagó `amountCents` y `split` indica cuánto le toca a cada uno.
+ * - settlement: `paidBy` le pasó dinero a quien figura en `split`.
+ */
+export type SharedEntry = {
+  id: string;
+  type: "expense" | "settlement";
+  paidBy: string;
+  amountCents: number;
+  /** YYYY-MM-DD */
+  date: string;
+  /** YYYY-MM, derivado de `date` */
+  month: string;
+  subcategoryId: string | null;
+  note: string;
+  /** uid → centavos que le corresponden (suma = amountCents) */
+  split: Record<string, number>;
+  createdBy: string;
+  createdAt: number;
+};
+
+export type ActionResult = { ok: true } | { ok: false; error: string };

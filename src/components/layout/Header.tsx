@@ -18,7 +18,12 @@ export function Header() {
     ),
     "/compartidos": (
       <Suspense fallback={null}>
-        <CountBadge load={getPendingInviteCount} label="invitaciones pendientes" />
+        <CountBadge load={() => getPendingInviteCount("expenses")} label="invitaciones pendientes" />
+      </Suspense>
+    ),
+    "/objetivos-compartidos": (
+      <Suspense fallback={null}>
+        <CountBadge load={() => getPendingInviteCount("goal")} label="invitaciones pendientes" />
       </Suspense>
     ),
   };

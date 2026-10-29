@@ -6,7 +6,7 @@ import { ArrowLeftRight, Check, Loader2, LogOut, Plus, Settings2, Trash2, Undo2,
 import { toast } from "sonner";
 import { ResponsiveSheet } from "@/components/common/ResponsiveSheet";
 import { PersonAvatar } from "@/components/contacts/PersonAvatar";
-import { ExpenseForm, SettlementForm } from "@/components/shared/EntryForms";
+import { ContributionForm, ExpenseForm, SettlementForm } from "@/components/shared/EntryForms";
 import { InviteSection, SpaceForm } from "@/components/shared/SpaceForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,12 @@ import type { ActionResult, Person, SharedMember, SharedSpace } from "@/lib/fina
 import { cn } from "@/lib/utils";
 
 export function NewSpaceButton({
+  kind = "expenses",
   contacts,
   className,
   variant = "default",
 }: {
+  kind?: SharedSpace["kind"];
   contacts: Person[];
   className?: string;
   variant?: "default" | "outline";
@@ -33,15 +35,19 @@ export function NewSpaceButton({
   return (
     <>
       <Button variant={variant} onClick={() => setOpen(true)} className={cn("h-10", className)}>
-        <Plus /> Nuevo espacio
+        <Plus /> {kind === "goal" ? "Nuevo objetivo" : "Nuevo espacio"}
       </Button>
       <ResponsiveSheet
         open={open}
         onOpenChange={setOpen}
-        title="Nuevo espacio compartido"
-        description="Un lugar para los gastos que comparten, como el auto. Las personas invitadas deben aceptar."
+        title={kind === "goal" ? "Nuevo objetivo compartido" : "Nuevo espacio compartido"}
+        description={
+          kind === "goal"
+            ? "Una meta para juntar entre varios, como unas vacaciones. Las personas invitadas deben aceptar."
+            : "Un lugar para los gastos que comparten, como el auto. Las personas invitadas deben aceptar."
+        }
       >
-        <SpaceForm contacts={contacts} onDone={() => setOpen(false)} />
+        <SpaceForm kind={kind} contacts={contacts} onDone={() => setOpen(false)} />
       </ResponsiveSheet>
     </>
   );
@@ -63,6 +69,20 @@ export function AddExpenseButton({ space, members, me }: EntryButtonProps) {
       </Button>
       <ResponsiveSheet open={open} onOpenChange={setOpen} title="Nuevo gasto" description={space.name}>
         <ExpenseForm space={space} members={members} me={me} onDone={() => setOpen(false)} />
+      </ResponsiveSheet>
+    </>
+  );
+}
+
+export function AddContributionButton({ space, members, me, saved }: EntryButtonProps & { saved: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)} className="h-10">
+        <Plus /> Aporte
+      </Button>
+      <ResponsiveSheet open={open} onOpenChange={setOpen} title="Aportar o retirar" description={space.name}>
+        <ContributionForm space={space} members={members} me={me} saved={saved} onDone={() => setOpen(false)} />
       </ResponsiveSheet>
     </>
   );
@@ -199,11 +219,12 @@ export function SpaceSettingsButton({ space, me, contacts }: SettingsProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const owner = space.createdBy === me;
+  const listPath = space.kind === "goal" ? "/objetivos-compartidos" : "/compartidos";
   const present = new Set(space.members.filter((m) => m.status !== "left").map((m) => m.uid));
   const invitable = contacts.filter((c) => !present.has(c.uid));
   const leave = () => {
-    toast.success("Saliste del espacio");
-    router.replace("/compartidos");
+    toast.success("Saliste");
+    router.replace(listPath);
   };
 
   return (
@@ -237,15 +258,15 @@ export function SpaceSettingsButton({ space, me, contacts }: SettingsProps) {
           </section>
 
           <div className="space-y-1 border-t pt-4">
-            <ConfirmButton label="Salir del espacio" icon={<LogOut />} run={() => leaveSharedSpace(space.id)} onSuccess={leave} />
+            <ConfirmButton label="Salir" icon={<LogOut />} run={() => leaveSharedSpace(space.id)} onSuccess={leave} />
             {owner && (
               <ConfirmButton
-                label="Eliminar espacio"
+                label="Eliminar"
                 icon={<Trash2 />}
                 run={() => deleteSharedSpace(space.id)}
                 onSuccess={() => {
-                  toast.success("Espacio eliminado");
-                  router.replace("/compartidos");
+                  toast.success("Eliminado");
+                  router.replace(listPath);
                 }}
               />
             )}

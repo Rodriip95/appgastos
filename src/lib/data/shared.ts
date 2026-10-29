@@ -4,7 +4,7 @@ import type { DocumentSnapshot, Timestamp } from "firebase-admin/firestore";
 import { verifySession } from "@/lib/auth/session";
 import { DOC_ID_RE, sharedCollection } from "@/lib/data/collections";
 import { toPerson } from "@/lib/data/profiles";
-import { computeBalance } from "@/lib/finance/shared";
+import { computeBalance, computeGoalProgress } from "@/lib/finance/shared";
 import type { SharedEntry, SharedMember, SharedSpace } from "@/lib/finance/types";
 
 export function toSpace(doc: DocumentSnapshot): SharedSpace {
@@ -14,21 +14,27 @@ export function toSpace(doc: DocumentSnapshot): SharedSpace {
   );
   return {
     id: doc.id,
-    kind: "expenses",
+    kind: d.kind === "goal" ? "goal" : "expenses",
     name: d.name ?? "",
     icon: d.icon ?? "wallet",
     color: d.color ?? "slate",
     createdBy: d.createdBy ?? "",
     members,
     subcategories: d.subcategories ?? [],
+    goal:
+      d.kind === "goal"
+        ? { targetCents: Number(d.goal?.targetCents) || 0, targetDate: d.goal?.targetDate ?? null }
+        : null,
   };
 }
+
+const ENTRY_TYPES = ["expense", "settlement", "deposit", "withdrawal"];
 
 function toEntry(doc: DocumentSnapshot): SharedEntry {
   const d = doc.data() ?? {};
   return {
     id: doc.id,
-    type: d.type === "settlement" ? "settlement" : "expense",
+    type: ENTRY_TYPES.includes(d.type) ? d.type : "expense",
     paidBy: d.paidBy,
     amountCents: Number(d.amountCents) || 0,
     date: d.date,
@@ -49,10 +55,10 @@ export const acceptedMembers = (space: SharedSpace) => space.members.filter((m) 
 
 export type SpaceSummary = {
   space: SharedSpace;
-  /** Total gastado en el espacio, en centavos */
+  /** Gastos: total gastado. Objetivos: total reservado (centavos) */
   total: number;
-  /** Neto de quien consulta, en centavos (positivo = puso de más) */
-  myNet: number;
+  /** Gastos: saldo de quien consulta. Objetivos: lo que aportó neto (centavos) */
+  mine: number;
 };
 
 export type SharedOverview = {
@@ -61,23 +67,26 @@ export type SharedOverview = {
   invites: SharedSpace[];
 };
 
-export const getSharedOverview = cache(async (): Promise<SharedOverview> => {
+export const getSharedOverview = cache(async (kind: SharedSpace["kind"]): Promise<SharedOverview> => {
   const { uid } = await verifySession();
   const snap = await sharedCollection().where("memberIds", "array-contains", uid).get();
-  const all = snap.docs.map(toSpace);
+  const docs = snap.docs.filter((d) => toSpace(d).kind === kind);
+  const all = docs.map(toSpace);
   const statusOf = (s: SharedSpace) => s.members.find((m) => m.uid === uid)?.status;
 
   const spaces = await Promise.all(
-    snap.docs
+    docs
       .filter((doc) => statusOf(toSpace(doc)) === "accepted")
       .map(async (doc) => {
         const space = toSpace(doc);
         const entries = (await doc.ref.collection("entries").get()).docs.map(toEntry);
-        const balance = computeBalance(
-          entries,
-          space.members.map((m) => m.uid),
-        );
-        return { space, total: balance.total, myNet: balance.people[uid]?.net ?? 0 };
+        const uids = space.members.map((m) => m.uid);
+        if (kind === "goal") {
+          const progress = computeGoalProgress(entries, uids);
+          return { space, total: progress.saved, mine: progress.people[uid] ?? 0 };
+        }
+        const balance = computeBalance(entries, uids);
+        return { space, total: balance.total, mine: balance.people[uid]?.net ?? 0 };
       }),
   );
   return {
@@ -94,18 +103,19 @@ export type SharedDetail = {
 };
 
 /** Espacio y movimientos; null si no existe o quien consulta no participa. */
-export async function getSharedDetail(id: string): Promise<SharedDetail | null> {
+export async function getSharedDetail(id: string, kind: SharedSpace["kind"]): Promise<SharedDetail | null> {
   const { uid } = await verifySession();
   if (!DOC_ID_RE.test(id)) return null;
   const doc = await sharedCollection().doc(id).get();
   if (!doc.exists) return null;
   const space = toSpace(doc);
+  if (space.kind !== kind) return null;
   if (space.members.find((m) => m.uid === uid)?.status !== "accepted") return null;
   const entries = (await doc.ref.collection("entries").get()).docs.map(toEntry).sort(newestFirst);
   return { space, entries, me: uid };
 }
 
 /** Cantidad de invitaciones a espacios compartidos sin responder (globito del menú). */
-export const getPendingInviteCount = cache(async (): Promise<number> => {
-  return (await getSharedOverview()).invites.length;
+export const getPendingInviteCount = cache(async (kind: SharedSpace["kind"]): Promise<number> => {
+  return (await getSharedOverview(kind)).invites.length;
 });

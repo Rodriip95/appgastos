@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createSharedSpace, inviteToSharedSpace, updateSharedSpace } from "@/lib/actions/shared";
 import { COLOR_KEYS, type ColorKey, type IconKey } from "@/lib/finance/catalog";
+import { formatAmountInput, parseAmount, todayKey } from "@/lib/finance/format";
+import { fromCents } from "@/lib/finance/shared";
 import type { Person, SharedSpace } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +31,25 @@ const SPACE_ICONS: IconKey[] = [
   "receipt",
 ];
 
-const SUGGESTED_SUBS = ["Nafta", "Service", "Seguro", "Patente", "Lavado"];
+const GOAL_ICONS: IconKey[] = [
+  "plane",
+  "car",
+  "house",
+  "piggy-bank",
+  "gift",
+  "graduation-cap",
+  "laptop",
+  "baby",
+  "heart-pulse",
+  "landmark",
+  "wallet",
+  "shopping-cart",
+];
+
+const SUGGESTED_SUBS = {
+  expenses: ["Nafta", "Service", "Seguro", "Patente", "Lavado"],
+  goal: ["Alquiler", "Mercadería", "Nafta", "Vuelos", "Salidas"],
+} as const;
 
 /** Lista de contactos con casillas para elegir a quién invitar. */
 export function ContactPicker({
@@ -124,16 +144,24 @@ export function InviteSection({ spaceId, contacts }: { spaceId: string; contacts
 }
 
 type Props = {
+  /** Qué se crea; al editar se toma del espacio */
+  kind?: SharedSpace["kind"];
   space?: SharedSpace;
   /** Contactos a quienes invitar al crear */
   contacts: Person[];
   onDone: () => void;
 };
 
-export function SpaceForm({ space, contacts, onDone }: Props) {
+export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone }: Props) {
+  const kind = space?.kind ?? kindProp;
+  const isGoal = kind === "goal";
   const [name, setName] = useState(space?.name ?? "");
-  const [icon, setIcon] = useState<IconKey>(space?.icon ?? "car");
+  const [icon, setIcon] = useState<IconKey>(space?.icon ?? (isGoal ? "plane" : "car"));
   const [color, setColor] = useState<ColorKey>(space?.color ?? "sky");
+  const [target, setTarget] = useState(
+    space?.goal ? formatAmountInput(String(fromCents(space.goal.targetCents)).replace(".", ",")) : "",
+  );
+  const [targetDate, setTargetDate] = useState(space?.goal?.targetDate ?? "");
   const [subs, setSubs] = useState<{ id?: string; name: string }[]>(space?.subcategories ?? []);
   const [invite, setInvite] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
@@ -144,11 +172,21 @@ export function SpaceForm({ space, contacts, onDone }: Props) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const subcategories = subs.filter((s) => s.name.trim());
+    if (isGoal && !parseAmount(target)) {
+      toast.error("Ingresa el monto que quieren juntar");
+      return;
+    }
     startTransition(async () => {
-      const input = { name, icon, color, subcategories };
+      const input = {
+        name,
+        icon,
+        color,
+        subcategories,
+        ...(isGoal && { target: parseAmount(target) ?? 0, targetDate: targetDate || null }),
+      };
       const res = space
         ? await updateSharedSpace(space.id, input)
-        : await createSharedSpace(input, [...invite]);
+        : await createSharedSpace(kind, input, [...invite]);
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -168,7 +206,7 @@ export function SpaceForm({ space, contacts, onDone }: Props) {
             id="space-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ej: Auto"
+            placeholder={isGoal ? "Ej: Vacaciones" : "Ej: Auto"}
             maxLength={40}
             autoComplete="off"
             className="h-11 text-base"
@@ -177,10 +215,46 @@ export function SpaceForm({ space, contacts, onDone }: Props) {
         </div>
       </div>
 
+      {isGoal && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="space-target">¿Cuánto quieren juntar?</Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
+                $
+              </span>
+              <Input
+                id="space-target"
+                inputMode="decimal"
+                autoComplete="off"
+                value={target}
+                onChange={(e) => setTarget(formatAmountInput(e.target.value))}
+                placeholder="0"
+                className="h-11 pl-7 text-base tabular-nums"
+                required
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="space-date">
+              ¿Para cuándo? <span className="font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+            <Input
+              id="space-date"
+              type="date"
+              value={targetDate}
+              min={todayKey()}
+              onChange={(e) => setTargetDate(e.target.value)}
+              className="h-11 text-base"
+            />
+          </div>
+        </div>
+      )}
+
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Ícono</legend>
         <div className="grid grid-cols-6 gap-2">
-          {SPACE_ICONS.map((key) => {
+          {(isGoal ? GOAL_ICONS : SPACE_ICONS).map((key) => {
             const Icon = CATEGORY_ICONS[key];
             const selected = key === icon;
             return (
@@ -227,7 +301,7 @@ export function SpaceForm({ space, contacts, onDone }: Props) {
       </fieldset>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">Subcategorías</legend>
+        <legend className="text-sm font-medium">{isGoal ? "Conceptos" : "Subcategorías"}</legend>
         <div className="space-y-2">
           {subs.map((s, i) => (
             <div key={s.id ?? i} className="flex items-center gap-2">
@@ -235,12 +309,12 @@ export function SpaceForm({ space, contacts, onDone }: Props) {
                 value={s.name}
                 onChange={(e) => setSub(i, e.target.value)}
                 maxLength={30}
-                aria-label={`Subcategoría ${i + 1}`}
+                aria-label={`${isGoal ? "Concepto" : "Subcategoría"} ${i + 1}`}
                 className="h-10"
               />
               <button
                 type="button"
-                aria-label="Quitar subcategoría"
+                aria-label="Quitar"
                 onClick={() => setSubs((list) => list.filter((_, j) => j !== i))}
                 className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted"
               >
@@ -259,7 +333,7 @@ export function SpaceForm({ space, contacts, onDone }: Props) {
         </Button>
         {!space && subs.length === 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {SUGGESTED_SUBS.map((n) => (
+            {SUGGESTED_SUBS[kind].map((n) => (
               <button
                 key={n}
                 type="button"

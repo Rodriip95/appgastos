@@ -20,7 +20,7 @@ export default function SharedSpacePage({ params }: { params: Promise<{ id: stri
 
 async function SharedSpace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [detail, { contacts }] = await Promise.all([getSharedDetail(id), getContactsOverview()]);
+  const [detail, { contacts }] = await Promise.all([getSharedDetail(id, "expenses"), getContactsOverview()]);
   if (!detail) notFound();
   await io(); // "hoy" se calcula en cada request
   return <SharedSpaceView {...detail} contacts={contacts} today={todayKey()} />;

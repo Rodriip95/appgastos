@@ -7,7 +7,7 @@ import { firstName, money } from "@/components/shared/shared-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addSharedExpense, addSharedSettlement } from "@/lib/actions/shared";
+import { addGoalContribution, addSharedExpense, addSharedSettlement } from "@/lib/actions/shared";
 import { formatAmountInput, parseAmount, todayKey } from "@/lib/finance/format";
 import type { SharedMember, SharedSpace } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
@@ -125,6 +125,46 @@ function DateNoteFields({
   );
 }
 
+/** Chips para elegir una subcategoría (o concepto); "" = ninguna. */
+function ChipSelect({
+  label,
+  noneLabel,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  noneLabel: string;
+  options: { id: string; name: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <fieldset className="space-y-1.5">
+      <legend className="text-sm font-medium">{label}</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {[{ id: "", name: noneLabel }, ...options].map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            aria-pressed={value === s.id}
+            onClick={() => onChange(s.id)}
+            className={cn(
+              "rounded-full border px-3.5 py-1.5 text-sm transition",
+              value === s.id
+                ? "border-transparent bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 const nameOf = (m: SharedMember, me: string) => (m.uid === me ? "Tú" : firstName(m));
 
 type ExpenseProps = {
@@ -191,29 +231,13 @@ export function ExpenseForm({ space, members, me, onDone }: ExpenseProps) {
         ]}
       />
 
-      {space.subcategories.length > 0 && (
-        <fieldset className="space-y-1.5">
-          <legend className="text-sm font-medium">Subcategoría</legend>
-          <div className="flex flex-wrap gap-1.5">
-            {[{ id: "", name: "Ninguna" }, ...space.subcategories].map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                aria-pressed={subcategoryId === s.id}
-                onClick={() => setSubcategoryId(s.id)}
-                className={cn(
-                  "rounded-full border px-3.5 py-1.5 text-sm transition",
-                  subcategoryId === s.id
-                    ? "border-transparent bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      )}
+      <ChipSelect
+        label="Subcategoría"
+        noneLabel="Ninguna"
+        options={space.subcategories}
+        value={subcategoryId}
+        onChange={setSubcategoryId}
+      />
 
       <DateNoteFields date={date} setDate={setDate} note={note} setNote={setNote} />
 
@@ -274,6 +298,91 @@ export function SettlementForm({ spaceId, members, me, myNet, onDone }: Settleme
       <DateNoteFields date={date} setDate={setDate} note={note} setNote={setNote} />
       <Button type="submit" size="lg" className="h-12 text-base" disabled={pending || from === to}>
         {pending && <Loader2 className="animate-spin" />} Registrar pago
+      </Button>
+    </form>
+  );
+}
+
+type ContributionProps = {
+  space: SharedSpace;
+  /** Participantes activos */
+  members: SharedMember[];
+  me: string;
+  /** Total reservado en centavos: tope de los retiros */
+  saved: number;
+  onDone: () => void;
+};
+
+/** Aporte o retiro de un objetivo compartido. */
+export function ContributionForm({ space, members, me, saved, onDone }: ContributionProps) {
+  const [kind, setKind] = useState<"deposit" | "withdrawal">("deposit");
+  const [amount, setAmount] = useState("");
+  const [who, setWho] = useState(me);
+  const [subcategoryId, setSubcategoryId] = useState("");
+  const [date, setDate] = useState(todayKey());
+  const [note, setNote] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const value = parseAmount(amount);
+    if (!value) {
+      toast.error("Ingresa un monto mayor a 0");
+      return;
+    }
+    if (kind === "withdrawal" && Math.round(value * 100) > saved) {
+      toast.error(`Solo hay ${money(saved)} reservados`);
+      return;
+    }
+    startTransition(async () => {
+      const res = await addGoalContribution({
+        spaceId: space.id,
+        paidBy: who,
+        kind,
+        amount: value,
+        date,
+        note,
+        subcategoryId: subcategoryId || null,
+      });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(kind === "deposit" ? `Aportaste ${money(Math.round(value * 100))}` : "Retiro registrado");
+      onDone();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <Segmented
+        label="Movimiento"
+        value={kind}
+        onChange={setKind}
+        options={[
+          { value: "deposit", label: "Aportar" },
+          { value: "withdrawal", label: "Retirar" },
+        ]}
+      />
+      <AmountField id="contribution-amount" value={amount} onChange={setAmount} />
+      {members.length > 1 && (
+        <Segmented
+          label={kind === "deposit" ? "Aportó" : "Retiró"}
+          value={who}
+          onChange={setWho}
+          options={members.map((m) => ({ value: m.uid, label: nameOf(m, me) }))}
+        />
+      )}
+      <ChipSelect
+        label="Concepto"
+        noneLabel="Ninguno"
+        options={space.subcategories}
+        value={subcategoryId}
+        onChange={setSubcategoryId}
+      />
+      <DateNoteFields date={date} setDate={setDate} note={note} setNote={setNote} />
+      <Button type="submit" size="lg" className="h-12 text-base" disabled={pending}>
+        {pending && <Loader2 className="animate-spin" />} {kind === "deposit" ? "Registrar aporte" : "Registrar retiro"}
       </Button>
     </form>
   );

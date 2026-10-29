@@ -26,9 +26,24 @@ const spaceSchema = z.object({
 });
 
 export type SpaceInput = z.input<typeof spaceSchema> & {
-  /** Subcategorías; las que ya existen conservan su `id` */
+  /** Subcategorías (conceptos, en un objetivo); las que ya existen conservan su `id` */
   subcategories: { id?: string; name: string }[];
+  /** Solo en objetivos: monto a juntar y fecha límite opcional */
+  target?: number;
+  targetDate?: string | null;
 };
+
+const goalSchema = z.object({
+  target: z.number("Ingresa el monto a juntar").positive("El objetivo debe ser mayor a 0").max(MAX_AMOUNT),
+  targetDate: z.iso.date("Fecha inválida").nullable(),
+});
+
+/** Datos propios de un objetivo, o un error si faltan. */
+function goalFields(input: SpaceInput) {
+  const parsed = goalSchema.safeParse({ target: input.target, targetDate: input.targetDate ?? null });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos", goal: null };
+  return { error: null, goal: { targetCents: toCents(parsed.data.target), targetDate: parsed.data.targetDate } };
+}
 
 const personOf = (user: SessionUser) => ({
   name: user.name ?? user.email?.split("@")[0] ?? "",
@@ -81,19 +96,26 @@ async function loadSpace(spaceId: string, uid: string, status: "accepted" | "pen
 
 const pendingMember = (p: { name: string; email: string; photo: string | null }) => ({ ...p, status: "pending" });
 
-export async function createSharedSpace(input: SpaceInput, invite: string[]): Promise<ActionResult> {
+export async function createSharedSpace(
+  kind: "expenses" | "goal",
+  input: SpaceInput,
+  invite: string[],
+): Promise<ActionResult> {
   const me = await verifySession();
   const parsed = spaceSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
   const cleaned = cleanSubcategories(input.subcategories);
   if (cleaned.error) return fail(cleaned.error);
+  const goal = kind === "goal" ? goalFields(input) : null;
+  if (goal?.error) return fail(goal.error);
 
   try {
     const contacts = await contactsAmong(me.uid, invite);
     if (contacts.error) return fail(contacts.error);
 
     await sharedCollection().add({
-      kind: "expenses",
+      kind,
+      ...(goal && { goal: goal.goal }),
       ...parsed.data,
       createdBy: me.uid,
       subcategories: cleaned.subs,
@@ -122,8 +144,10 @@ export async function updateSharedSpace(id: string, input: SpaceInput): Promise<
   try {
     const found = await loadSpace(id, me.uid);
     if (!found) return fail("El espacio ya no está disponible");
+    const goal = found.space.kind === "goal" ? goalFields(input) : null;
+    if (goal?.error) return fail(goal.error);
     // Las subcategorías quitadas dejan sus movimientos como "Sin subcategoría".
-    await found.ref.update({ ...parsed.data, subcategories: cleaned.subs });
+    await found.ref.update({ ...parsed.data, subcategories: cleaned.subs, ...(goal && { goal: goal.goal }) });
   } catch (error) {
     console.error("[shared] update:", error);
     return fail("No pudimos guardar los cambios");
@@ -273,7 +297,7 @@ export async function addSharedExpense(input: SharedExpenseInput): Promise<Actio
 
   try {
     const found = await loadSpace(spaceId, me.uid);
-    if (!found) return fail("El espacio ya no está disponible");
+    if (!found || found.space.kind !== "expenses") return fail("El espacio ya no está disponible");
     const active = found.space.members.filter((m) => m.status === "accepted").map((m) => m.uid);
     if (!active.includes(paidBy)) return fail("Quien pagó no participa en el espacio");
     if (splitWith !== "equal" && !active.includes(splitWith)) return fail("El reparto incluye a alguien que no participa");
@@ -312,7 +336,7 @@ export async function addSharedSettlement(input: SharedSettlementInput): Promise
 
   try {
     const found = await loadSpace(spaceId, me.uid);
-    if (!found) return fail("El espacio ya no está disponible");
+    if (!found || found.space.kind !== "expenses") return fail("El espacio ya no está disponible");
     const active = found.space.members.filter((m) => m.status === "accepted").map((m) => m.uid);
     if (!active.includes(paidBy) || !active.includes(toUid)) return fail("Esa persona no participa en el espacio");
 
@@ -337,6 +361,63 @@ export async function addSharedSettlement(input: SharedSettlementInput): Promise
   return { ok: true };
 }
 
+const contributionSchema = z.object({
+  ...entryBase,
+  kind: z.enum(["deposit", "withdrawal"]),
+  subcategoryId: z.string().nullable(),
+});
+
+export type GoalContributionInput = z.input<typeof contributionSchema>;
+
+/** Suma de aportes menos retiros guardados en un objetivo, en centavos. */
+async function savedIn(ref: FirebaseFirestore.DocumentReference, skipEntryId?: string) {
+  const docs = (await ref.collection("entries").get()).docs.filter((d) => d.id !== skipEntryId);
+  return docs.reduce((sum, d) => {
+    const cents = Number(d.get("amountCents")) || 0;
+    return sum + (d.get("type") === "deposit" ? cents : d.get("type") === "withdrawal" ? -cents : 0);
+  }, 0);
+}
+
+/** Aporta (o retira) dinero de un objetivo compartido. */
+export async function addGoalContribution(input: GoalContributionInput): Promise<ActionResult> {
+  const me = await verifySession();
+  const parsed = contributionSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
+  const { spaceId, paidBy, kind, amount, date, note, subcategoryId } = parsed.data;
+
+  try {
+    const found = await loadSpace(spaceId, me.uid);
+    if (!found || found.space.kind !== "goal") return fail("El objetivo ya no está disponible");
+    const active = found.space.members.filter((m) => m.status === "accepted").map((m) => m.uid);
+    if (!active.includes(paidBy)) return fail("Esa persona no participa en el objetivo");
+    if (subcategoryId && !found.space.subcategories.some((s) => s.id === subcategoryId)) {
+      return fail("Concepto inválido");
+    }
+
+    const amountCents = toCents(amount);
+    if (kind === "withdrawal" && (await savedIn(found.ref)) < amountCents) {
+      return fail("No hay tanto reservado en este objetivo");
+    }
+    await found.ref.collection("entries").add({
+      type: kind,
+      paidBy,
+      amountCents,
+      date,
+      month: date.slice(0, 7),
+      subcategoryId: subcategoryId || null,
+      note,
+      split: {},
+      createdBy: me.uid,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("[shared] contribution:", error);
+    return fail("No pudimos registrar el movimiento");
+  }
+  refresh();
+  return { ok: true };
+}
+
 /** Cada uno puede borrar lo que cargó. */
 export async function deleteSharedEntry(spaceId: string, entryId: string): Promise<ActionResult> {
   const me = await verifySession();
@@ -348,6 +429,10 @@ export async function deleteSharedEntry(spaceId: string, entryId: string): Promi
     const entry = await ref.get();
     if (!entry.exists) return { ok: true };
     if (entry.get("createdBy") !== me.uid) return fail("Solo puede borrarlo quien lo cargó");
+    // Borrar un aporte no puede dejar el objetivo con menos de cero reservado.
+    if (entry.get("type") === "deposit" && (await savedIn(found.ref, entryId)) < 0) {
+      return fail("Hay retiros que dependen de este aporte");
+    }
     await ref.delete();
   } catch (error) {
     console.error("[shared] delete entry:", error);

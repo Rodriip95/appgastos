@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, Handshake, LayoutGrid, Menu, PiggyBank, Shapes, Users, X } from "lucide-react";
+import { CreditCard, Handshake, LayoutGrid, Menu, PiggyBank, Shapes, Target, Users, X } from "lucide-react";
 import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
 import {
   Drawer,
@@ -21,6 +21,7 @@ const ITEMS = [
   { href: "/ahorros", label: "Ahorros", hint: "Metas y dinero reservado", icon: PiggyBank },
   { href: "/categorias", label: "Categorías", hint: "Organiza tus movimientos", icon: Shapes },
   { href: "/compartidos", label: "Compartidos", hint: "Gastos que pagas con otros", icon: Handshake },
+  { href: "/objetivos-compartidos", label: "Objetivos", hint: "Metas que juntan entre varios", icon: Target },
   { href: "/contactos", label: "Contactos", hint: "Personas con las que compartes", icon: Users },
 ] as const;
 

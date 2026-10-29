@@ -16,7 +16,7 @@ export default function SharedPage() {
 }
 
 async function Shared() {
-  const [overview, { contacts }] = await Promise.all([getSharedOverview(), getContactsOverview()]);
+  const [overview, { contacts }] = await Promise.all([getSharedOverview("expenses"), getContactsOverview()]);
   return <SharedListView {...overview} contacts={contacts} />;
 }
 

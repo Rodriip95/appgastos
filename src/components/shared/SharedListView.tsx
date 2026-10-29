@@ -62,7 +62,7 @@ export function SharedListView({ spaces, invites, contacts }: Props) {
 
       {spaces.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2">
-          {spaces.map(({ space, total, myNet }) => (
+          {spaces.map(({ space, total, mine }) => (
             <Link
               key={space.id}
               href={`/compartidos/${space.id}`}
@@ -86,7 +86,7 @@ export function SharedListView({ spaces, invites, contacts }: Props) {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Saldo</p>
-                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{signedMoney(myNet)}</p>
+                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{signedMoney(mine)}</p>
                 </div>
               </div>
             </Link>

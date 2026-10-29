@@ -102,10 +102,10 @@ export type SharedMemberStatus = "pending" | "accepted" | "left";
 
 export type SharedMember = Person & { status: SharedMemberStatus };
 
-/** Espacio compartido entre contactos (hoy: gastos compartidos, p. ej. un auto). */
+/** Espacio compartido entre contactos: gastos compartidos (un auto) u objetivo compartido (unas vacaciones). */
 export type SharedSpace = {
   id: string;
-  kind: "expenses";
+  kind: "expenses" | "goal";
   name: string;
   icon: IconKey;
   color: ColorKey;
@@ -113,8 +113,10 @@ export type SharedSpace = {
   createdBy: string;
   /** Todos los que alguna vez participaron; el historial conserva a quienes se fueron */
   members: SharedMember[];
-  /** Subcategorías propias del espacio (nafta, service, seguro…) */
+  /** Subcategorías propias del espacio (nafta, service, seguro…); en un objetivo son los conceptos */
   subcategories: Subcategory[];
+  /** Solo en objetivos: monto a juntar (centavos) y fecha límite opcional */
+  goal: { targetCents: number; targetDate: string | null } | null;
 };
 
 /**
@@ -122,10 +124,11 @@ export type SharedSpace = {
  * los repartos no acumulen errores de redondeo.
  * - expense: `paidBy` pagó `amountCents` y `split` indica cuánto le toca a cada uno.
  * - settlement: `paidBy` le pasó dinero a quien figura en `split`.
+ * - deposit / withdrawal (objetivos): `paidBy` aportó o retiró `amountCents`; `split` va vacío.
  */
 export type SharedEntry = {
   id: string;
-  type: "expense" | "settlement";
+  type: "expense" | "settlement" | "deposit" | "withdrawal";
   paidBy: string;
   amountCents: number;
   /** YYYY-MM-DD */

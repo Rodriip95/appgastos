@@ -13,6 +13,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { PushToggle } from "@/components/notifications/PushToggle";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -134,8 +135,9 @@ export function SideMenu({ footer, badges }: { footer?: ReactNode; badges?: Badg
               })}
             </nav>
 
-            <div className="px-3 pb-3">
+            <div className="space-y-2 px-3 pb-3">
               <ThemeToggle />
+              <PushToggle />
             </div>
             {footer && <div className="border-t p-3">{footer}</div>}
           </div>

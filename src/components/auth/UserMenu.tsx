@@ -16,6 +16,7 @@ import { auth } from "@/lib/firebase/client";
 import { destroySession } from "@/lib/auth/actions";
 import type { SessionUser } from "@/lib/auth/session";
 import { ThemeToggle } from "@/components/common/ThemeToggle";
+import { PushToggle } from "@/components/notifications/PushToggle";
 import { cn } from "@/lib/utils";
 
 function useSignOut() {
@@ -93,8 +94,9 @@ export function UserMenu({ user }: { user: SessionUser }) {
           {user.email && <p className="truncate text-xs text-muted-foreground">{user.email}</p>}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <div className="p-1">
+        <div className="space-y-1.5 p-1">
           <ThemeToggle />
+          <PushToggle />
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem

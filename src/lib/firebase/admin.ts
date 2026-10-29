@@ -2,6 +2,7 @@ import "server-only";
 import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getMessaging } from "firebase-admin/messaging";
 
 // Inicialización perezosa: el build no necesita credenciales, solo el runtime.
 function getAdminApp() {
@@ -18,3 +19,4 @@ function getAdminApp() {
 
 export const getAdminAuth = () => getAuth(getAdminApp());
 export const getAdminDb = () => getFirestore(getAdminApp());
+export const getAdminMessaging = () => getMessaging(getAdminApp());

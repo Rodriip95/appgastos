@@ -6,6 +6,7 @@ import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { contactRequestsCollection, DOC_ID_RE, userCollection } from "@/lib/data/collections";
 import { findProfileByEmail, toPerson, upsertProfile } from "@/lib/data/profiles";
+import { notify } from "@/lib/data/push";
 import type { ActionResult } from "@/lib/finance/types";
 
 const emailSchema = z.email("Ingresa un email válido").max(254);
@@ -33,16 +34,16 @@ export async function sendContactRequest(email: string): Promise<ActionResult> {
     const reverseRef = requests.doc(requestId(target.uid, me.uid));
     const myContact = userCollection(me.uid, "contacts").doc(target.uid);
 
-    const error = await ref.firestore.runTransaction(async (tx) => {
+    const outcome = await ref.firestore.runTransaction(async (tx): Promise<{ error: string | null; notify?: "request" | "accepted" }> => {
       const [existing, reverse, contact, mine] = await Promise.all([
         tx.get(ref),
         tx.get(reverseRef),
         tx.get(myContact),
         tx.get(ref.firestore.collection("users").doc(me.uid)),
       ]);
-      if (contact.exists) return "Ya es tu contacto";
+      if (contact.exists) return { error: "Ya es tu contacto" };
       // Una solicitud pendiente o rechazada no se duplica ni se revela.
-      if (existing.exists) return null;
+      if (existing.exists) return { error: null };
 
       // Si esa persona ya me había invitado, aceptarla directamente.
       if (reverse.exists && reverse.get("status") === "pending") {
@@ -55,7 +56,7 @@ export async function sendContactRequest(email: string): Promise<ActionResult> {
           photo: mine.get("photo") ?? null,
           since,
         });
-        return null;
+        return { error: null, notify: "accepted" };
       }
 
       tx.set(ref, {
@@ -70,9 +71,15 @@ export async function sendContactRequest(email: string): Promise<ActionResult> {
         to: { name: target.name, email: target.email, photo: target.photo },
         createdAt: FieldValue.serverTimestamp(),
       });
-      return null;
+      return { error: null, notify: "request" };
     });
-    if (error) return fail(error);
+    if (outcome.error) return fail(outcome.error);
+    const who = me.name ?? me.email ?? "Alguien";
+    if (outcome.notify === "request") {
+      notify([target.uid], { title: "Solicitud de contacto", body: `${who} quiere agregarte en Bingo`, url: "/contactos" });
+    } else if (outcome.notify === "accepted") {
+      notify([target.uid], { title: "Contacto agregado", body: `${who} aceptó tu solicitud`, url: "/contactos" });
+    }
   } catch (error) {
     console.error("[contacts] send:", error);
     return fail("No pudimos enviar la solicitud");
@@ -87,12 +94,14 @@ export async function respondContactRequest(id: string, accept: boolean): Promis
   if (!idSchema.safeParse(id).success) return fail("Solicitud inválida");
 
   const ref = contactRequestsCollection().doc(id);
+  let requester: string | null = null;
   try {
     const error = await ref.firestore.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists || snap.get("toUid") !== me.uid || snap.get("status") !== "pending") {
         return "La solicitud ya no está disponible";
       }
+      if (accept) requester = snap.get("fromUid");
       const fromUid: string = snap.get("fromUid");
       if (!accept) {
         tx.update(ref, { status: "rejected", respondedAt: FieldValue.serverTimestamp() });
@@ -117,6 +126,13 @@ export async function respondContactRequest(id: string, accept: boolean): Promis
       return null;
     });
     if (error) return fail(error);
+    if (requester) {
+      notify([requester], {
+        title: "Contacto agregado",
+        body: `${me.name ?? me.email ?? "Alguien"} aceptó tu solicitud`,
+        url: "/contactos",
+      });
+    }
   } catch (error) {
     console.error("[contacts] respond:", error);
     return fail("No pudimos responder la solicitud");

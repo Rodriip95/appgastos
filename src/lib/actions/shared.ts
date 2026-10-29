@@ -6,9 +6,11 @@ import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { verifySession, type SessionUser } from "@/lib/auth/session";
 import { DOC_ID_RE, sharedCollection, userCollection } from "@/lib/data/collections";
+import { notify } from "@/lib/data/push";
 import { toSpace } from "@/lib/data/shared";
 import { COLOR_KEYS, ICON_KEYS } from "@/lib/finance/catalog";
-import { splitEqual, toCents } from "@/lib/finance/shared";
+import { formatMoney } from "@/lib/finance/format";
+import { fromCents, splitEqual, toCents } from "@/lib/finance/shared";
 import type { ActionResult } from "@/lib/finance/types";
 
 const idSchema = z.string().regex(DOC_ID_RE);
@@ -94,6 +96,17 @@ async function loadSpace(spaceId: string, uid: string, status: "accepted" | "pen
   return { ref, space };
 }
 
+const listPath = (kind: "expenses" | "goal") => (kind === "goal" ? "/objetivos-compartidos" : "/compartidos");
+const whoIs = (user: SessionUser) => (user.name ?? user.email ?? "Alguien").split(" ")[0];
+
+/** Avisa a los demás participantes activos de un espacio. */
+function notifyMembers(space: { id: string; kind: "expenses" | "goal"; members: { uid: string; status: string }[] }, me: string, title: string, body: string) {
+  notify(
+    space.members.filter((m) => m.status === "accepted" && m.uid !== me).map((m) => m.uid),
+    { title, body, url: `${listPath(space.kind)}/${space.id}` },
+  );
+}
+
 const pendingMember = (p: { name: string; email: string; photo: string | null }) => ({ ...p, status: "pending" });
 
 export async function createSharedSpace(
@@ -126,6 +139,14 @@ export async function createSharedSpace(
       },
       createdAt: FieldValue.serverTimestamp(),
     });
+    notify(
+      contacts.people.map((p) => p.uid),
+      {
+        title: kind === "goal" ? "Invitación a un objetivo" : "Invitación a un gasto compartido",
+        body: `${whoIs(me)} te invitó a “${parsed.data.name}”`,
+        url: listPath(kind),
+      },
+    );
   } catch (error) {
     console.error("[shared] create:", error);
     return fail("No pudimos crear el espacio");
@@ -173,6 +194,14 @@ export async function inviteToSharedSpace(id: string, invite: string[]): Promise
       memberIds: FieldValue.arrayUnion(...fresh.map((p) => p.uid)),
       ...Object.fromEntries(fresh.map((p) => [`members.${p.uid}`, pendingMember(p)])),
     });
+    notify(
+      fresh.map((p) => p.uid),
+      {
+        title: found.space.kind === "goal" ? "Invitación a un objetivo" : "Invitación a un gasto compartido",
+        body: `${whoIs(me)} te invitó a “${found.space.name}”`,
+        url: listPath(found.space.kind),
+      },
+    );
   } catch (error) {
     console.error("[shared] invite:", error);
     return fail("No pudimos enviar la invitación");
@@ -188,6 +217,7 @@ export async function respondSharedInvite(id: string, accept: boolean): Promise<
     if (!found) return fail("La invitación ya no está disponible");
     if (accept) {
       await found.ref.update({ [`members.${me.uid}`]: { ...personOf(me), status: "accepted" } });
+      notifyMembers(found.space, me.uid, "Se sumó al espacio", `${whoIs(me)} aceptó unirse a “${found.space.name}”`);
     } else {
       await found.ref.update({
         memberIds: FieldValue.arrayRemove(me.uid),
@@ -318,6 +348,7 @@ export async function addSharedExpense(input: SharedExpenseInput): Promise<Actio
       createdBy: me.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
+    notifyMembers(found.space, me.uid, found.space.name, `${whoIs(me)} cargó un gasto de ${formatMoney(fromCents(amountCents))}`);
   } catch (error) {
     console.error("[shared] add expense:", error);
     return fail("No pudimos registrar el gasto");
@@ -353,6 +384,7 @@ export async function addSharedSettlement(input: SharedSettlementInput): Promise
       createdBy: me.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
+    notifyMembers(found.space, me.uid, found.space.name, `${whoIs(me)} registró un pago de ${formatMoney(fromCents(amountCents))}`);
   } catch (error) {
     console.error("[shared] add settlement:", error);
     return fail("No pudimos registrar el pago");
@@ -446,6 +478,12 @@ export async function addGoalContribution(input: GoalContributionInput): Promise
       createdBy: me.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
+    notifyMembers(
+      found.space,
+      me.uid,
+      found.space.name,
+      `${whoIs(me)} ${kind === "deposit" ? "aportó" : "retiró"} ${formatMoney(fromCents(amountCents))}`,
+    );
   } catch (error) {
     console.error("[shared] contribution:", error);
     return fail("No pudimos registrar el movimiento");

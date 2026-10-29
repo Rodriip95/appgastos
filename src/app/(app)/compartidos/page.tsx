@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { SharedListView } from "@/components/shared/SharedListView";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCategories } from "@/lib/data/categories";
 import { getContactsOverview } from "@/lib/data/contacts";
 import { getSharedOverview } from "@/lib/data/shared";
+import { toExpenseCategories } from "@/lib/finance/defaults";
 
 export const metadata: Metadata = { title: "Gastos compartidos · Bingo" };
 
@@ -16,8 +18,12 @@ export default function SharedPage() {
 }
 
 async function Shared() {
-  const [overview, { contacts }] = await Promise.all([getSharedOverview("expenses"), getContactsOverview()]);
-  return <SharedListView {...overview} contacts={contacts} />;
+  const [overview, { contacts }, categories] = await Promise.all([
+    getSharedOverview("expenses"),
+    getContactsOverview(),
+    getCategories(),
+  ]);
+  return <SharedListView {...overview} contacts={contacts} categories={toExpenseCategories(categories)} />;
 }
 
 function SharedSkeleton() {

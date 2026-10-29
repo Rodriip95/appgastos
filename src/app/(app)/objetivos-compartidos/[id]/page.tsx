@@ -8,6 +8,7 @@ import { getCategories } from "@/lib/data/categories";
 import { getContactsOverview } from "@/lib/data/contacts";
 import { getSharedDetail } from "@/lib/data/shared";
 import { getSharedLinks } from "@/lib/data/shared-links";
+import { toExpenseCategories } from "@/lib/finance/defaults";
 import { todayKey } from "@/lib/finance/format";
 
 export const metadata: Metadata = { title: "Objetivo compartido · Bingo" };
@@ -36,7 +37,7 @@ async function SharedGoal({ params }: { params: Promise<{ id: string }> }) {
       contacts={contacts}
       today={todayKey()}
       link={links[id] ?? null}
-      expenseCategories={categories.filter((c) => c.type === "expense").map((c) => ({ id: c.id, name: c.name }))}
+      expenseCategories={toExpenseCategories(categories)}
     />
   );
 }

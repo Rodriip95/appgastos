@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createSharedSpace, inviteToSharedSpace, updateSharedSpace } from "@/lib/actions/shared";
 import { COLOR_KEYS, type ColorKey, type IconKey } from "@/lib/finance/catalog";
+import { suggestionCategories, type ExpenseCategory } from "@/lib/finance/defaults";
 import { formatAmountInput, parseAmount, todayKey } from "@/lib/finance/format";
 import { fromCents } from "@/lib/finance/shared";
 import type { Person, SharedSpace } from "@/lib/finance/types";
@@ -45,11 +46,6 @@ const GOAL_ICONS: IconKey[] = [
   "wallet",
   "shopping-cart",
 ];
-
-const SUGGESTED_SUBS = {
-  expenses: ["Nafta", "Service", "Seguro", "Patente", "Lavado"],
-  goal: ["Alquiler", "Mercadería", "Nafta", "Vuelos", "Salidas"],
-} as const;
 
 /** Lista de contactos con casillas para elegir a quién invitar. */
 export function ContactPicker({
@@ -149,10 +145,12 @@ type Props = {
   space?: SharedSpace;
   /** Contactos a quienes invitar al crear */
   contacts: Person[];
+  /** Mis categorías de gasto: de la elegida salen los conceptos sugeridos */
+  categories: ExpenseCategory[];
   onDone: () => void;
 };
 
-export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone }: Props) {
+export function SpaceForm({ kind: kindProp = "expenses", space, contacts, categories, onDone }: Props) {
   const kind = space?.kind ?? kindProp;
   const isGoal = kind === "goal";
   const [name, setName] = useState(space?.name ?? "");
@@ -164,7 +162,27 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone
   const [targetDate, setTargetDate] = useState(space?.goal?.targetDate ?? "");
   const [subs, setSubs] = useState<{ id?: string; name: string }[]>(space?.subcategories ?? []);
   const [invite, setInvite] = useState<Set<string>>(new Set());
+  const [categoryName, setCategoryName] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const options = suggestionCategories(categories);
+  const suggested = options.find((c) => c.name === categoryName)?.subcategories ?? [];
+  // No se suma otro concepto mientras haya uno sin completar.
+  const hasBlank = subs.some((s) => !s.name.trim());
+
+  function pickCategory(name: string) {
+    const category = options.find((c) => c.name === name);
+    if (!category) return;
+    if (categoryName === name) {
+      setCategoryName(null);
+      return;
+    }
+    setCategoryName(name);
+    // Al crear, el ícono y el color acompañan a la categoría (se pueden cambiar después).
+    if (!space) {
+      setIcon(category.icon);
+      setColor(category.color);
+    }
+  }
 
   const setSub = (i: number, value: string) =>
     setSubs((list) => list.map((s, j) => (j === i ? { ...s, name: value } : s)));
@@ -301,6 +319,29 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone
       </fieldset>
 
       <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Categoría</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {options.map((c) => (
+            <button
+              key={c.name}
+              type="button"
+              aria-pressed={categoryName === c.name}
+              onClick={() => pickCategory(c.name)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition",
+                categoryName === c.name
+                  ? "border-transparent bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {categoryName === c.name && <Check className="size-3" />}
+              {c.name}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-2">
         <legend className="text-sm font-medium">{isGoal ? "Conceptos" : "Subcategorías"}</legend>
         <div className="space-y-2">
           {subs.map((s, i) => (
@@ -309,6 +350,7 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone
                 value={s.name}
                 onChange={(e) => setSub(i, e.target.value)}
                 maxLength={30}
+                autoFocus={!s.name && i === subs.length - 1}
                 aria-label={`${isGoal ? "Concepto" : "Subcategoría"} ${i + 1}`}
                 className="h-10"
               />
@@ -327,12 +369,13 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone
           type="button"
           variant="outline"
           className="h-10"
+          disabled={hasBlank}
           onClick={() => setSubs((list) => [...list, { name: "" }])}
         >
           <Plus /> Agregar
         </Button>
         <div className="flex flex-wrap gap-1.5 pt-1">
-          {SUGGESTED_SUBS[kind].map((n) => {
+          {suggested.map((n) => {
             const on = subs.some((s) => s.name.trim().toLowerCase() === n.toLowerCase());
             return (
               <button
@@ -344,7 +387,7 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, onDone
                     on
                       ? list.filter((s) => s.name.trim().toLowerCase() !== n.toLowerCase())
                       : // Usa el primer renglón vacío antes de sumar otro.
-                        list.some((s) => !s.name.trim())
+                        hasBlank
                         ? list.map((s, i, all) => (i === all.findIndex((x) => !x.name.trim()) ? { ...s, name: n } : s))
                         : [...list, { name: n }],
                   )

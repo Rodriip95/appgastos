@@ -5,12 +5,13 @@ import { PersonAvatar } from "@/components/contacts/PersonAvatar";
 import { InviteResponse, NewSpaceButton } from "@/components/shared/SharedSheets";
 import { activeMembers, money, signedMoney } from "@/components/shared/shared-ui";
 import type { SharedOverview } from "@/lib/data/shared";
+import type { ExpenseCategory } from "@/lib/finance/defaults";
 import type { Person } from "@/lib/finance/types";
 
-type Props = SharedOverview & { contacts: Person[] };
+type Props = SharedOverview & { contacts: Person[]; categories: ExpenseCategory[] };
 
 /** Lista de espacios compartidos. Solo presentación: los datos llegan de `(app)/compartidos/page.tsx`. */
-export function SharedListView({ spaces, invites, contacts }: Props) {
+export function SharedListView({ spaces, invites, contacts, categories }: Props) {
   const empty = spaces.length === 0 && invites.length === 0;
   return (
     <main className="space-y-5">
@@ -21,7 +22,7 @@ export function SharedListView({ spaces, invites, contacts }: Props) {
             Lo que pagan entre varios, como el auto, con su balance y su historial.
           </p>
         </div>
-        {!empty && <NewSpaceButton contacts={contacts} />}
+        {!empty && <NewSpaceButton contacts={contacts} categories={categories} />}
       </div>
 
       {empty && (
@@ -34,7 +35,7 @@ export function SharedListView({ spaces, invites, contacts }: Props) {
             Uno por cada cosa que comparten: el auto, la casa, las salidas. Invita a un contacto y vayan
             cargando gastos.
           </p>
-          <NewSpaceButton contacts={contacts} className="h-11" />
+          <NewSpaceButton contacts={contacts} categories={categories} className="h-11" />
         </div>
       )}
 

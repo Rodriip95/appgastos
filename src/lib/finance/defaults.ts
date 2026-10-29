@@ -1,3 +1,4 @@
+import type { ColorKey, IconKey } from "@/lib/finance/catalog";
 import type { Category } from "@/lib/finance/types";
 
 type DefaultCategory = Omit<Category, "id" | "subcategories" | "budget"> & { subcategories: string[] };
@@ -26,3 +27,32 @@ export const DEFAULT_CATEGORIES: DefaultCategory[] = [
   { type: "income", name: "Regalos", icon: "gift", color: "pink", description: "", subcategories: [] },
   { type: "income", name: "Otros ingresos", icon: "wallet", color: "slate", description: "", subcategories: [] },
 ];
+
+/** Categoría de gasto con sus subcategorías por nombre; sirve para sugerir conceptos. */
+export type ExpenseCategory = {
+  id: string;
+  name: string;
+  icon: IconKey;
+  color: ColorKey;
+  subcategories: string[];
+};
+
+export const toExpenseCategories = (categories: Category[]): ExpenseCategory[] =>
+  categories
+    .filter((c) => c.type === "expense")
+    .map((c) => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, subcategories: c.subcategories.map((s) => s.name) }));
+
+export type SuggestionCategory = Omit<ExpenseCategory, "id">;
+
+/**
+ * Categorías entre las que elegir al crear un espacio compartido: primero las del
+ * usuario que tienen subcategorías y después las sugeridas que no tiene todavía.
+ */
+export function suggestionCategories(mine: ExpenseCategory[]): SuggestionCategory[] {
+  const own = mine.filter((c) => c.subcategories.length > 0);
+  const taken = new Set(own.map((c) => c.name.toLowerCase()));
+  const defaults = DEFAULT_CATEGORIES.filter(
+    (c) => c.type === "expense" && c.subcategories.length > 0 && !taken.has(c.name.toLowerCase()),
+  );
+  return [...own, ...defaults].map(({ name, icon, color, subcategories }) => ({ name, icon, color, subcategories }));
+}

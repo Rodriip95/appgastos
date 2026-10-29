@@ -5,13 +5,14 @@ import { PersonAvatar } from "@/components/contacts/PersonAvatar";
 import { InviteResponse, NewSpaceButton } from "@/components/shared/SharedSheets";
 import { activeMembers, money } from "@/components/shared/shared-ui";
 import type { SharedOverview } from "@/lib/data/shared";
+import type { ExpenseCategory } from "@/lib/finance/defaults";
 import type { Person } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
-type Props = SharedOverview & { contacts: Person[] };
+type Props = SharedOverview & { contacts: Person[]; categories: ExpenseCategory[] };
 
 /** Lista de objetivos compartidos. Solo presentación: los datos llegan de `(app)/objetivos-compartidos/page.tsx`. */
-export function GoalListView({ spaces, invites, contacts }: Props) {
+export function GoalListView({ spaces, invites, contacts, categories }: Props) {
   const empty = spaces.length === 0 && invites.length === 0;
   return (
     <main className="space-y-5">
@@ -22,7 +23,7 @@ export function GoalListView({ spaces, invites, contacts }: Props) {
             Metas que juntan entre varios, con lo que aporta cada uno y en qué se destina.
           </p>
         </div>
-        {!empty && <NewSpaceButton kind="goal" contacts={contacts} />}
+        {!empty && <NewSpaceButton kind="goal" contacts={contacts} categories={categories} />}
       </div>
 
       {empty && (
@@ -35,7 +36,7 @@ export function GoalListView({ spaces, invites, contacts }: Props) {
             Unas vacaciones, un auto, una mudanza: definan cuánto juntar e inviten a un contacto para ir
             sumando aportes.
           </p>
-          <NewSpaceButton kind="goal" contacts={contacts} className="h-11" />
+          <NewSpaceButton kind="goal" contacts={contacts} categories={categories} className="h-11" />
         </div>
       )}
 

@@ -14,6 +14,7 @@ import type { SharedDetail } from "@/lib/data/shared";
 import { formatDayLabel, formatMoney, formatMonth } from "@/lib/finance/format";
 import { goalPlan } from "@/lib/finance/goals";
 import { computeGoalProgress, fromCents, progressByConcept } from "@/lib/finance/shared";
+import type { ExpenseCategory } from "@/lib/finance/defaults";
 import type { Person } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,7 @@ type Props = SharedDetail & {
   contacts: Person[];
   today: string;
   link: SummaryLink;
-  expenseCategories: { id: string; name: string }[];
+  expenseCategories: ExpenseCategory[];
 };
 
 /** Detalle de un objetivo compartido: avance, aportes por persona y por concepto, historial. */

@@ -18,17 +18,20 @@ import {
   respondSharedInvite,
   setSharedLink,
 } from "@/lib/actions/shared";
+import type { ExpenseCategory } from "@/lib/finance/defaults";
 import type { ActionResult, Person, SharedMember, SharedSpace } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 export function NewSpaceButton({
   kind = "expenses",
   contacts,
+  categories,
   className,
   variant = "default",
 }: {
   kind?: SharedSpace["kind"];
   contacts: Person[];
+  categories: ExpenseCategory[];
   className?: string;
   variant?: "default" | "outline";
 }) {
@@ -48,7 +51,7 @@ export function NewSpaceButton({
             : "Un lugar para los gastos que comparten, como el auto. Las personas invitadas deben aceptar."
         }
       >
-        <SpaceForm kind={kind} contacts={contacts} onDone={() => setOpen(false)} />
+        <SpaceForm kind={kind} contacts={contacts} categories={categories} onDone={() => setOpen(false)} />
       </ResponsiveSheet>
     </>
   );
@@ -218,7 +221,7 @@ type SettingsProps = {
   contacts: Person[];
   link: SummaryLink;
   /** Mis categorías de gasto, para elegir dónde cae mi parte */
-  expenseCategories: { id: string; name: string }[];
+  expenseCategories: ExpenseCategory[];
 };
 
 /** Interruptor para sumar mi parte de este espacio al resumen mensual personal. */
@@ -315,7 +318,7 @@ export function SpaceSettingsButton({ space, me, contacts, link, expenseCategori
       </button>
       <ResponsiveSheet open={open} onOpenChange={setOpen} title="Ajustes" description={space.name}>
         <div className="flex flex-col gap-7">
-          <SpaceForm space={space} contacts={contacts} onDone={() => setOpen(false)} />
+          <SpaceForm space={space} contacts={contacts} categories={expenseCategories} onDone={() => setOpen(false)} />
 
           <SummaryLinkSection spaceId={space.id} kind={space.kind} link={link} categories={expenseCategories} />
 

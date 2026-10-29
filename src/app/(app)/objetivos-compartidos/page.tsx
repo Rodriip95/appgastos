@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { GoalListView } from "@/components/shared/GoalListView";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCategories } from "@/lib/data/categories";
 import { getContactsOverview } from "@/lib/data/contacts";
 import { getSharedOverview } from "@/lib/data/shared";
+import { toExpenseCategories } from "@/lib/finance/defaults";
 
 export const metadata: Metadata = { title: "Objetivos compartidos · Bingo" };
 
@@ -16,8 +18,12 @@ export default function SharedGoalsPage() {
 }
 
 async function SharedGoals() {
-  const [overview, { contacts }] = await Promise.all([getSharedOverview("goal"), getContactsOverview()]);
-  return <GoalListView {...overview} contacts={contacts} />;
+  const [overview, { contacts }, categories] = await Promise.all([
+    getSharedOverview("goal"),
+    getContactsOverview(),
+    getCategories(),
+  ]);
+  return <GoalListView {...overview} contacts={contacts} categories={toExpenseCategories(categories)} />;
 }
 
 function GoalsSkeleton() {

@@ -15,6 +15,7 @@ import { activeMembers, firstName, money, signedMoney, toneAt } from "@/componen
 import type { SharedDetail } from "@/lib/data/shared";
 import { formatDayLabel } from "@/lib/finance/format";
 import { balanceBySubcategory, computeBalance } from "@/lib/finance/shared";
+import type { ExpenseCategory } from "@/lib/finance/defaults";
 import type { Person } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,7 @@ type Props = SharedDetail & {
   contacts: Person[];
   today: string;
   link: SummaryLink;
-  expenseCategories: { id: string; name: string }[];
+  expenseCategories: ExpenseCategory[];
 };
 
 /** Detalle de un espacio: balance, desglose por subcategoría e historial. */

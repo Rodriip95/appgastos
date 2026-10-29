@@ -31,6 +31,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // El teclado achica el área visible (y los paneles) en vez de taparla.
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fffaf6" },
     { media: "(prefers-color-scheme: dark)", color: "#1a0f0b" },

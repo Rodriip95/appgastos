@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useAmountInput } from "@/hooks/use-amount-input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -85,6 +86,7 @@ export function TransactionForm({
   const [cardId, setCardId] = useState<string | null>(transaction?.cardId ?? null);
   const [installments, setInstallments] = useState(1);
   const [amountError, setAmountError] = useState(false);
+  const { ref: amountRef, onFocus: onAmountFocus, focus: focusAmount } = useAmountInput(!transaction);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -246,7 +248,10 @@ export function TransactionForm({
         <Label htmlFor="tx-amount" className="justify-center text-muted-foreground">
           Monto
         </Label>
-        <div className="mt-1 flex max-w-full items-baseline justify-center gap-1 overflow-hidden">
+        <div
+          className="mt-1 flex max-w-full cursor-text items-baseline justify-center gap-1 overflow-hidden py-2"
+          onClick={focusAmount}
+        >
           <span
             className={cn("shrink-0 text-3xl font-semibold", isIncome ? "text-emerald-600" : "text-rose-600")}
             aria-hidden
@@ -269,7 +274,8 @@ export function TransactionForm({
                 setAmountError(false);
               }}
               aria-invalid={amountError}
-              autoFocus={!transaction}
+              ref={amountRef}
+              onFocus={onAmountFocus}
               readOnly={!!purchaseId}
               className="col-start-1 row-start-1 w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/40"
             />

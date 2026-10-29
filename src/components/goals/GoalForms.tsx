@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useAmountInput } from "@/hooks/use-amount-input";
 import { Check, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -230,6 +231,7 @@ export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFo
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
   const deposit = kind === "deposit";
+  const { ref: amountRef, onFocus: onAmountFocus, focus: focusAmount } = useAmountInput();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -288,7 +290,7 @@ export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFo
         <Label htmlFor="mov-amount" className="justify-center text-muted-foreground">
           {deposit ? "¿Cuánto apartas?" : "¿Cuánto retiras?"}
         </Label>
-        <div className="mt-1 flex items-baseline justify-center gap-1">
+        <div className="mt-1 flex cursor-text items-baseline justify-center gap-1 py-2" onClick={focusAmount}>
           <span className="shrink-0 text-3xl font-semibold text-muted-foreground" aria-hidden>
             {deposit ? "+" : "−"}$
           </span>
@@ -301,7 +303,8 @@ export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFo
               inputMode="decimal"
               autoComplete="off"
               placeholder="0"
-              autoFocus
+              ref={amountRef}
+              onFocus={onAmountFocus}
               value={amount}
               onChange={(e) => setAmount(formatAmountInput(e.target.value))}
               className="col-start-1 row-start-1 w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/40"

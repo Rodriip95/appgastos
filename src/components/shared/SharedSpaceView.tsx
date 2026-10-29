@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowLeftRight, History, Receipt } from "lucide-react";
 import { CategoryIcon } from "@/components/categories/CategoryIcon";
 import { CollapsibleList } from "@/components/common/CollapsibleList";
 import { PersonAvatar } from "@/components/contacts/PersonAvatar";
-import { BalanceBeam } from "@/components/shared/BalanceBeam";
+import { BalanceLine } from "@/components/shared/BalanceLine";
 import {
   AddExpenseButton,
   AddSettlementButton,
@@ -46,28 +46,33 @@ export function SharedSpaceView({ space, entries, me, contacts, today, link, exp
         <ArrowLeft className="size-4" /> Compartidos
       </Link>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <CategoryIcon icon={space.icon} color={space.color} size="lg" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{space.name}</h1>
-          <div className="mt-1 flex -space-x-2">
-            {members.map((m) => (
-              <PersonAvatar key={m.uid} person={m} className="size-7 border-2 border-background text-xs" />
-            ))}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <CategoryIcon icon={space.icon} color={space.color} size="lg" />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-2xl font-semibold tracking-tight">{space.name}</h1>
+            <div className="mt-1 flex -space-x-2">
+              {members.map((m) => (
+                <PersonAvatar key={m.uid} person={m} className="size-7 border-2 border-background text-xs" />
+              ))}
+            </div>
           </div>
+          <SpaceSettingsButton
+            space={space}
+            me={me}
+            contacts={contacts}
+            link={link}
+            expenseCategories={expenseCategories}
+          />
         </div>
-        <AddSettlementButton space={space} members={members} me={me} myNet={myNet} />
-        <AddExpenseButton space={space} members={members} me={me} />
-        <SpaceSettingsButton
-          space={space}
-          me={me}
-          contacts={contacts}
-          link={link}
-          expenseCategories={expenseCategories}
-        />
+        {/* Los botones van en su propia fila: en el celular el título no entra junto a ellos */}
+        <div className="flex gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
+          <AddExpenseButton space={space} members={members} me={me} />
+          <AddSettlementButton space={space} members={members} me={me} myNet={myNet} />
+        </div>
       </div>
 
-      <BalanceBeam members={members} balance={balance} me={me} />
+      <BalanceLine members={members} balance={balance} me={me} />
 
       {bySub.length > 0 && (
         <section aria-label="Por subcategoría" className="rounded-3xl border bg-card p-4 sm:p-5">

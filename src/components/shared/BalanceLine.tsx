@@ -4,8 +4,6 @@ import type { Balance } from "@/lib/finance/shared";
 import type { SharedMember } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
-const MAX_TILT = 14;
-
 type Props = {
   /** Participantes activos, en orden fijo */
   members: SharedMember[];
@@ -14,15 +12,16 @@ type Props = {
 };
 
 /**
- * Balance del espacio: una barra que se inclina hacia quien puso de más y, debajo,
- * lo que pagó y el saldo de cada uno. Solo números.
+ * Balance del espacio: una línea entre las dos personas con un indicador que se
+ * corre hacia quien pagó menos (al centro cuando están parejos) y, debajo, lo que
+ * pagó y el saldo de cada uno. Solo números.
  */
-export function BalanceBeam({ members, balance, me }: Props) {
+export function BalanceLine({ members, balance, me }: Props) {
   const pair = members.length === 2 ? members : null;
   const netLeft = pair ? (balance.people[pair[0].uid]?.net ?? 0) : 0;
+  // −1…1: positivo = la persona de la izquierda puso de más, el indicador va a la derecha.
   const ratio = balance.total ? Math.max(-1, Math.min(1, (netLeft / balance.total) * 2)) : 0;
-  // Con rotate positivo cae el lado derecho; el izquierdo cae cuando puso de más.
-  const tilt = -ratio * MAX_TILT;
+  const position = 50 + ratio * 50;
 
   return (
     <section aria-label="Balance" className="rounded-3xl border bg-card p-5">
@@ -30,26 +29,20 @@ export function BalanceBeam({ members, balance, me }: Props) {
       <p className="mt-0.5 text-4xl font-semibold tracking-tight tabular-nums">{money(balance.total)}</p>
 
       {pair && (
-        <div className="relative mx-auto mt-6 mb-2 h-20 max-w-sm" aria-hidden>
-          <div
-            className="absolute inset-x-0 top-5 flex items-center transition-transform duration-500 ease-out"
-            style={{ transform: `rotate(${tilt}deg)` }}
-          >
-            <div className="relative h-2.5 w-full overflow-hidden rounded-full">
+        <div className="mt-5 flex items-center gap-3" aria-hidden>
+          <PersonAvatar person={pair[0]} className="size-9" />
+          <div className="relative h-9 flex-1">
+            <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full">
               <div className={cn("absolute inset-y-0 left-0 w-1/2", toneAt(0).dot)} />
               <div className={cn("absolute inset-y-0 right-0 w-1/2", toneAt(1).dot)} />
             </div>
-            {pair.map((m, i) => (
-              <div
-                key={m.uid}
-                className={cn("absolute -top-4 transition-transform duration-500", i === 0 ? "-left-1" : "-right-1")}
-                style={{ transform: `rotate(${-tilt}deg)` }}
-              >
-                <PersonAvatar person={m} className="size-9 border-2 border-card" />
-              </div>
-            ))}
+            <div className="absolute top-1/2 left-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-background/80" />
+            <div
+              className="absolute top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-foreground bg-background shadow-md transition-[left] duration-500 ease-out"
+              style={{ left: `${position}%` }}
+            />
           </div>
-          <div className="absolute top-[26px] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[9px] border-b-[18px] border-x-transparent border-b-muted-foreground/40" />
+          <PersonAvatar person={pair[1]} className="size-9" />
         </div>
       )}
 

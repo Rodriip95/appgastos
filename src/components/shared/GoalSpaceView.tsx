@@ -62,29 +62,34 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
         <ArrowLeft className="size-4" /> Objetivos
       </Link>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <CategoryIcon icon={space.icon} color={space.color} size="lg" />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{space.name}</h1>
-          <div className="mt-1 flex items-center gap-2">
-            <div className="flex -space-x-2">
-              {members.map((m) => (
-                <PersonAvatar key={m.uid} person={m} className="size-7 border-2 border-background text-xs" />
-              ))}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <CategoryIcon icon={space.icon} color={space.color} size="lg" />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-2xl font-semibold tracking-tight">{space.name}</h1>
+            <div className="mt-1 flex items-center gap-2">
+              <div className="flex -space-x-2">
+                {members.map((m) => (
+                  <PersonAvatar key={m.uid} person={m} className="size-7 border-2 border-background text-xs" />
+                ))}
+              </div>
+              {targetDate && (
+                <span className="text-xs text-muted-foreground">{formatMonth(targetDate.slice(0, 7))}</span>
+              )}
             </div>
-            {targetDate && (
-              <span className="text-xs text-muted-foreground">{formatMonth(targetDate.slice(0, 7))}</span>
-            )}
           </div>
+          <SpaceSettingsButton
+            space={space}
+            me={me}
+            contacts={contacts}
+            link={link}
+            expenseCategories={expenseCategories}
+          />
         </div>
-        <AddContributionButton space={space} members={members} me={me} saved={progress.saved} />
-        <SpaceSettingsButton
-          space={space}
-          me={me}
-          contacts={contacts}
-          link={link}
-          expenseCategories={expenseCategories}
-        />
+        {/* El botón va en su propia fila: en el celular el título no entra junto a él */}
+        <div className="flex gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
+          <AddContributionButton space={space} members={members} me={me} saved={progress.saved} />
+        </div>
       </div>
 
       <section aria-label="Avance" className="rounded-3xl border bg-card p-5">

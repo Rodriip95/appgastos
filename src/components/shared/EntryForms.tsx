@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { firstName, money } from "@/components/shared/shared-ui";
@@ -56,12 +56,23 @@ function AmountField({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const input = useRef<HTMLInputElement>(null);
+
+  // En el celular el teclado no se abre solo: aparecía antes de terminar la
+  // animación del panel y lo levantaba. Se abre al tocar el monto.
+  useEffect(() => {
+    if (window.matchMedia("(min-width: 768px)").matches) input.current?.focus();
+  }, []);
+
   return (
     <div className="text-center">
       <Label htmlFor={id} className="sr-only">
         Monto
       </Label>
-      <div className="flex items-baseline justify-center gap-1">
+      <div
+        className="flex cursor-text items-baseline justify-center gap-1 py-3"
+        onClick={() => input.current?.focus()}
+      >
         <span className="shrink-0 text-3xl font-semibold text-muted-foreground" aria-hidden>
           $
         </span>
@@ -74,7 +85,7 @@ function AmountField({
             inputMode="decimal"
             autoComplete="off"
             placeholder="0"
-            autoFocus
+            ref={input}
             value={value}
             onChange={(e) => onChange(formatAmountInput(e.target.value))}
             className="col-start-1 row-start-1 w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground/40"

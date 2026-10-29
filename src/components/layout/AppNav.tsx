@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, Handshake, LayoutGrid, Menu, PiggyBank, Shapes, Target, Users, X } from "lucide-react";
+import { CreditCard, Handshake, LayoutGrid, Menu, PiggyBank, Shapes, Target, Trash2, Users, X } from "lucide-react";
 import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
 import {
   Drawer,
@@ -26,6 +26,14 @@ const ITEMS = [
   { href: "/contactos", label: "Contactos", hint: "Personas con las que compartes", icon: Users },
 ] as const;
 
+/** Módulo de pruebas que se muestra solo con el flag `enable_data_reset` (ver Header). */
+const RESET_ITEM = {
+  href: "/eliminar-datos",
+  label: "Eliminar información",
+  hint: "Borra todo y empieza de cero",
+  icon: Trash2,
+} as const;
+
 function useIsActive() {
   const pathname = usePathname();
   return (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
@@ -35,7 +43,7 @@ function useIsActive() {
 /** Globitos por ruta (p. ej. solicitudes pendientes); llegan del servidor. */
 type Badges = Record<string, ReactNode>;
 
-export function DesktopNav({ badges }: { badges?: Badges }) {
+export function DesktopNav({ badges, extra }: { badges?: Badges; extra?: ReactNode }) {
   const isActive = useIsActive();
   return (
     <nav className="hidden items-center gap-1 md:flex" aria-label="Principal">
@@ -59,7 +67,55 @@ export function DesktopNav({ badges }: { badges?: Badges }) {
           {badges?.[href]}
         </Link>
       ))}
+      {extra}
     </nav>
+  );
+}
+
+/** Enlace al módulo de borrado en el header (desktop). */
+export function DataResetDesktopLink() {
+  const isActive = useIsActive();
+  const { href, label, icon: Icon } = RESET_ITEM;
+  return (
+    <Link
+      href={href}
+      aria-current={isActive(href) ? "page" : undefined}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition lg:px-3",
+        isActive(href) ? "bg-muted font-medium text-destructive" : "text-destructive/80 hover:text-destructive",
+      )}
+    >
+      <Icon className="size-4" />
+      <span className="hidden xl:inline">{label}</span>
+    </Link>
+  );
+}
+
+/** Enlace al módulo de borrado en el menú lateral (mobile); cierra el menú al tocarlo. */
+export function DataResetMenuLink() {
+  const isActive = useIsActive();
+  const { href, label, hint, icon: Icon } = RESET_ITEM;
+  return (
+    <DrawerClose asChild>
+      <Link
+        href={href}
+        aria-current={isActive(href) ? "page" : undefined}
+        className={cn(
+          "flex items-center gap-3 rounded-xl px-3 py-2.5 transition",
+          isActive(href) ? "bg-muted" : "hover:bg-muted/60",
+        )}
+      >
+        <span className="grid size-9 place-items-center rounded-lg bg-destructive/10 text-destructive">
+          <Icon className="size-4" />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm text-destructive">{label}</span>
+          <span className="block truncate text-xs text-muted-foreground">{hint}</span>
+        </span>
+      </Link>
+    </DrawerClose>
   );
 }
 
@@ -67,7 +123,15 @@ export function DesktopNav({ badges }: { badges?: Badges }) {
  * Menú lateral (mobile). `footer` llega del servidor con los datos del usuario,
  * así el botón del menú puede prerenderizarse sin esperar la sesión.
  */
-export function SideMenu({ footer, badges }: { footer?: ReactNode; badges?: Badges }) {
+export function SideMenu({
+  footer,
+  badges,
+  extra,
+}: {
+  footer?: ReactNode;
+  badges?: Badges;
+  extra?: ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const isActive = useIsActive();
 
@@ -133,6 +197,7 @@ export function SideMenu({ footer, badges }: { footer?: ReactNode; badges?: Badg
                   </Link>
                 );
               })}
+              {extra}
             </nav>
 
             <div className="space-y-2 px-3 pb-3">

@@ -3,10 +3,16 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
 import { UserCard, UserMenu } from "@/components/auth/UserMenu";
-import { DesktopNav, SideMenu } from "@/components/layout/AppNav";
+import {
+  DataResetDesktopLink,
+  DataResetMenuLink,
+  DesktopNav,
+  SideMenu,
+} from "@/components/layout/AppNav";
 import { getSessionUser } from "@/lib/auth/session";
 import { getPendingRequestCount } from "@/lib/data/contacts";
 import { getPendingInviteCount } from "@/lib/data/shared";
+import { getFlags, type Flags } from "@/lib/flags";
 
 // Shell estático (se prerenderiza); lo dependiente de la sesión se transmite en streaming.
 export function Header() {
@@ -35,6 +41,13 @@ export function Header() {
           <Suspense fallback={<span className="size-10 md:hidden" />}>
             <SideMenu
               badges={badges}
+              extra={
+                <Suspense fallback={null}>
+                  <FlagGate flag="dataReset">
+                    <DataResetMenuLink />
+                  </FlagGate>
+                </Suspense>
+              }
               footer={
                 <Suspense fallback={<Skeleton className="h-9 w-full rounded-full" />}>
                   <MenuUser />
@@ -49,7 +62,16 @@ export function Header() {
             <BingoWordmark size="sm" />
           </Link>
           <Suspense fallback={null}>
-            <DesktopNav badges={badges} />
+            <DesktopNav
+              badges={badges}
+              extra={
+                <Suspense fallback={null}>
+                  <FlagGate flag="dataReset">
+                    <DataResetDesktopLink />
+                  </FlagGate>
+                </Suspense>
+              }
+            />
           </Suspense>
         </div>
         <Suspense fallback={<Skeleton className="size-9 rounded-full" />}>
@@ -83,4 +105,9 @@ async function CountBadge({ load, label }: { load: () => Promise<number>; label:
       {count}
     </span>
   );
+}
+
+/** Muestra `children` solo si el flag de Remote Config está encendido para quien tiene la sesión. */
+async function FlagGate({ flag, children }: { flag: keyof Flags; children: React.ReactNode }) {
+  return (await getFlags())[flag] ? children : null;
 }

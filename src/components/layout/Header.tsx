@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
 import { UserCard, UserMenu } from "@/components/auth/UserMenu";
 import { DesktopNav, SideMenu } from "@/components/layout/AppNav";
 import { getSessionUser } from "@/lib/auth/session";
@@ -20,10 +20,10 @@ export function Header() {
             }
           />
           <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="grid size-8 place-items-center rounded-xl bg-primary text-primary-foreground">
-              <Wallet className="size-4" />
+            <span className="grid size-9 place-items-center rounded-xl bg-secondary">
+              <BingoMark className="size-7" />
             </span>
-            Mis Gastos
+            <BingoWordmark size="sm" />
           </Link>
           <DesktopNav />
         </div>

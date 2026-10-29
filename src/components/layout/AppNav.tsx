@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, LayoutGrid, Menu, PiggyBank, Shapes, Wallet, X } from "lucide-react";
+import { CreditCard, LayoutGrid, Menu, PiggyBank, Shapes, X } from "lucide-react";
+import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
 import {
   Drawer,
   DrawerClose,
@@ -75,10 +76,12 @@ export function SideMenu({ footer }: { footer?: ReactNode }) {
           <div className="flex h-full flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
             <div className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-2">
-                <span className="grid size-8 place-items-center rounded-xl bg-primary text-primary-foreground">
-                  <Wallet className="size-4" />
+                <span className="grid size-9 place-items-center rounded-xl bg-secondary">
+                  <BingoMark className="size-7" />
                 </span>
-                <DrawerTitle className="text-base font-semibold tracking-tight">Mis Gastos</DrawerTitle>
+                <DrawerTitle>
+                  <BingoWordmark size="sm" />
+                </DrawerTitle>
               </div>
               <DrawerClose
                 aria-label="Cerrar menú"

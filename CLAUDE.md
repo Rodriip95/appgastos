@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Proyecto
 
-App web de gastos mensuales (idioma de la UI: español). Core: registrar ingresos y gastos, y generar resúmenes/análisis mensuales (cuánto ingresó, cuánto se gastó y en qué). Las categorías y subcategorías (ej. "Carro" > "Seguro") las define el propio usuario, no son fijas. Login con Google; los datos se guardan por usuario.
+**Bingo**: app web de gastos mensuales (idioma de la UI: español), con la marca basada en Bingo, el perro salchicha rojo del dueño. Core: registrar ingresos y gastos, y generar resúmenes/análisis mensuales (cuánto ingresó, cuánto se gastó y en qué). Las categorías y subcategorías (ej. "Carro" > "Seguro") las define el propio usuario, no son fijas. Login con Google; los datos se guardan por usuario.
 
 Stack: Next.js (App Router, `src/` dir, alias `@/*`), TypeScript, Tailwind CSS v4, shadcn/ui (estilo radix-nova, íconos lucide), zod, Firebase (Auth con Google + Firestore vía firebase-admin). Diseño mobile first.
 
@@ -63,6 +63,12 @@ El navegador **no** accede a Firestore: `firestore.rules` bloquea todo y todo pa
 - Tema claro/oscuro con next-themes (`ThemeProvider`, `ThemeToggle` en el menú). PWA: `app/manifest.ts` + `public/icon.svg`.
 - Navegación (`components/layout/AppNav.tsx`): en mobile, menú lateral (`SideMenu`, Drawer de vaul con `direction="left"`) abierto desde el botón ☰ del header, con el usuario y cerrar sesión al pie (llega del servidor como prop `footer`). En desktop, links en el header (`DesktopNav`). Las secciones se definen una sola vez en `ITEMS`.
 - Home: si el usuario tiene tarjetas, `CardsStrip` muestra un carrusel con el próximo vencimiento de cada una (enlaza a `/tarjetas`).
+
+## Marca (Bingo)
+- Paleta en `src/app/globals.css`: blanco cálido (`--background`), marrón rojizo como `--primary` (#9c3b22) y naranja como `--brand-orange` (#f28c28, clase `bg-brand-orange`/`text-brand-orange`). En oscuro el primario pasa a ser el naranja. Verde/rojo quedan solo para ingreso/gasto.
+- Ilustraciones en `components/brand/Bingo.tsx` (SVG inline, sin el pan): `BingoDog` (`variant="hello"` en el login, `"wallet"` con la billetera en la home vía `BingoGreeting`), `BingoMark` (cabeza: header, menú, ícono) y `BingoWordmark` (logotipo).
+- Tipografía del logotipo: Fredoka (Google Fonts, `font-brand`), letras con rebote y borde marrón. La fuente de Bluey es propietaria; Fredoka es la alternativa libre más parecida.
+- Exportes estáticos en `public/brand/*.svg` e ícono PWA en `public/icon.svg`.
 
 ## Next.js
 

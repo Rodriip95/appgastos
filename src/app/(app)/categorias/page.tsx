@@ -11,7 +11,7 @@ import {
 import { getCategories } from "@/lib/data/categories";
 import type { Category, TxType } from "@/lib/finance/types";
 
-export const metadata: Metadata = { title: "Categorías · Mis Gastos" };
+export const metadata: Metadata = { title: "Categorías · Bingo" };
 
 export default function CategoriesPage() {
   return (

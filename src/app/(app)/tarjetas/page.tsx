@@ -17,7 +17,7 @@ import { formatMoney, formatMonthShort, formatShortDate, shiftMonth, todayKey } 
 import type { CreditCard, Transaction } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Tarjetas · Mis Gastos" };
+export const metadata: Metadata = { title: "Tarjetas · Bingo" };
 
 /** Meses de resúmenes futuros que se muestran por tarjeta. */
 const MONTHS_AHEAD = 6;

@@ -6,7 +6,7 @@ import { GoalsView } from "@/components/goals/GoalsView";
 import { getGoals, getRecentGoalMovements } from "@/lib/data/goals";
 import { todayKey } from "@/lib/finance/format";
 
-export const metadata: Metadata = { title: "Ahorros y metas · Mis Gastos" };
+export const metadata: Metadata = { title: "Ahorros y metas · Bingo" };
 
 export default function SavingsPage() {
   return (

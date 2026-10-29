@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { BingoGreeting } from "@/components/brand/BingoGreeting";
 import { CardsStrip } from "@/components/cards/CardsStrip";
 import { DueReminders } from "@/components/cards/DueReminders";
 import { BalanceCard } from "@/components/dashboard/BalanceCard";
@@ -84,6 +85,7 @@ export function DashboardView({
       usage={usage}
     >
       <main className="space-y-5">
+        {isCurrent && <BingoGreeting balance={summary.balance} hasMovements={transactions.length > 0} />}
         {isCurrent && <DueReminders dues={dues} />}
 
         <MonthSwitcher

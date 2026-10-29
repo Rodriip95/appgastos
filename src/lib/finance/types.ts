@@ -48,4 +48,32 @@ export type CreditCard = {
   color: ColorKey;
 };
 
+/** Meta de ahorro: un objetivo con monto y, opcionalmente, fecha límite. */
+export type Goal = {
+  id: string;
+  name: string;
+  /** Monto objetivo */
+  target: number;
+  /** Fecha objetivo (YYYY-MM-DD) o null si no tiene */
+  targetDate: string | null;
+  icon: IconKey;
+  color: ColorKey;
+  /** Lo reservado hasta hoy (suma de aportes menos retiros) */
+  saved: number;
+};
+
+/** Aporte (+) o retiro (−) de dinero reservado para una meta. */
+export type GoalMovement = {
+  id: string;
+  goalId: string;
+  /** Positivo = aporte; negativo = retiro */
+  amount: number;
+  /** YYYY-MM-DD */
+  date: string;
+  /** YYYY-MM, derivado de `date` */
+  month: string;
+  note: string;
+  createdAt: number;
+};
+
 export type ActionResult = { ok: true } | { ok: false; error: string };

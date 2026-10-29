@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils";
 
 const typeLabel = (type: TxType) => (type === "income" ? "ingreso" : "gasto");
 
+/** Subcategorías visibles en la tarjeta; el resto se resume como "+N". */
+const MAX_CHIPS = 4;
+
 /** Tarjeta de categoría; al tocarla se abre el editor. */
 export function CategoryCard({ category }: { category: Category }) {
   const [open, setOpen] = useState(false);
@@ -32,11 +35,16 @@ export function CategoryCard({ category }: { category: Category }) {
           )}
           {category.subcategories.length > 0 && (
             <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {category.subcategories.map((s) => (
+              {category.subcategories.slice(0, MAX_CHIPS).map((s) => (
                 <span key={s.id} className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
                   {s.name}
                 </span>
               ))}
+              {category.subcategories.length > MAX_CHIPS && (
+                <span className="rounded-full border border-dashed px-2.5 py-0.5 text-xs text-muted-foreground">
+                  +{category.subcategories.length - MAX_CHIPS}
+                </span>
+              )}
             </div>
           )}
         </div>

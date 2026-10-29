@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Target } from "lucide-react";
 import { CategoryIcon } from "@/components/categories/CategoryIcon";
+import { CollapsibleList } from "@/components/common/CollapsibleList";
 import { formatMoney } from "@/lib/finance/format";
 import type { MonthSummary } from "@/lib/finance/summary";
 import type { Category } from "@/lib/finance/types";
@@ -37,7 +38,7 @@ export function BudgetsCard({
           Editar
         </Link>
       </div>
-      <ul className="mt-3 space-y-3.5">
+      <CollapsibleList limit={4} className="mt-3 space-y-3.5" noun="presupuestos">
         {items.map(({ category, spent, pct }) => {
           const over = pct > 100;
           const warn = pct >= 80;
@@ -78,7 +79,7 @@ export function BudgetsCard({
             </li>
           );
         })}
-      </ul>
+      </CollapsibleList>
     </section>
   );
 }

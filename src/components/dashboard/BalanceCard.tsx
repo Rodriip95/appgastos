@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowDownLeft, ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, PiggyBank, TrendingDown, TrendingUp } from "lucide-react";
 import { formatMoney, formatMonthShort } from "@/lib/finance/format";
 import { changePct, type MonthSummary } from "@/lib/finance/summary";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,8 @@ type Props = {
   previous?: { income: number; expense: number; month: string };
   /** Gasto proyectado a fin de mes (solo mes en curso) */
   projection?: number | null;
+  /** Neto apartado para metas este mes (aportes − retiros) */
+  saved?: number;
   /** Botón para registrar un ingreso (va en el total de ingresos) */
   incomeAction?: ReactNode;
   /** Botón para registrar un gasto (va en el total de gastos) */
@@ -19,7 +21,14 @@ type Props = {
 /** Id de la fila de totales: el + flotante aparece cuando sale de pantalla. */
 export const BALANCE_ACTIONS_ID = "balance-actions";
 
-export function BalanceCard({ summary, previous, projection, incomeAction, expenseAction }: Props) {
+export function BalanceCard({
+  summary,
+  previous,
+  projection,
+  saved = 0,
+  incomeAction,
+  expenseAction,
+}: Props) {
   const { income, expense, balance } = summary;
   const spentPct = income > 0 ? Math.round((expense / income) * 100) : null;
   const prevLabel = previous ? formatMonthShort(previous.month).toLowerCase() : "";
@@ -54,6 +63,22 @@ export function BalanceCard({ summary, previous, projection, incomeAction, expen
             {projection ? ` · Al ritmo actual cerrarías en ${formatMoney(projection)}` : ""}
           </p>
         </div>
+      )}
+
+      {saved !== 0 && (
+        <p className="mt-3 flex items-center gap-2 rounded-xl bg-primary-foreground/10 px-3 py-2 text-xs text-primary-foreground/80">
+          <PiggyBank className="size-4 shrink-0" />
+          <span>
+            {saved > 0 ? "Apartaste" : "Retiraste"}{" "}
+            <strong className="font-semibold text-primary-foreground tabular-nums">
+              {formatMoney(Math.abs(saved))}
+            </strong>{" "}
+            {saved > 0 ? "para tus metas" : "de tus metas"} · Libre:{" "}
+            <strong className="font-semibold text-primary-foreground tabular-nums">
+              {formatMoney(balance - saved)}
+            </strong>
+          </span>
+        </p>
       )}
 
       <div id={BALANCE_ACTIONS_ID} className="mt-5 grid grid-cols-2 gap-3">

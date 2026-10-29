@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Inbox, Search, SearchX, X } from "lucide-react";
+import { ShowMoreButton } from "@/components/common/CollapsibleList";
 import { TransactionRow } from "@/components/transactions/TransactionSheet";
 import { formatDayLabel, formatMoney, formatMonthShort } from "@/lib/finance/format";
 import type { Category, Transaction } from "@/lib/finance/types";
@@ -17,6 +18,8 @@ type Props = {
   /** Link para quitar el filtro */
   clearFilterHref: string;
 };
+
+const DAYS_STEP = 7;
 
 const normalize = (s: string) =>
   s
@@ -33,6 +36,8 @@ export function TransactionList({
   clearFilterHref,
 }: Props) {
   const [query, setQuery] = useState("");
+  // Días visibles: el mes completo puede ser muy largo; se carga de a tandas.
+  const [dayLimit, setDayLimit] = useState(DAYS_STEP);
 
   if (transactions.length === 0) {
     return (
@@ -63,6 +68,7 @@ export function TransactionList({
     return normalize(`${t.note} ${c?.name ?? ""} ${sub}`).includes(q);
   });
 
+  const searching = Boolean(q) || Boolean(filterKey);
   const days = new Map<string, Transaction[]>();
   for (const tx of visible) days.set(tx.date, [...(days.get(tx.date) ?? []), tx]);
 
@@ -116,7 +122,7 @@ export function TransactionList({
           No hay movimientos que coincidan.
         </div>
       ) : (
-        [...days].map(([date, items]) => {
+        [...days].slice(0, searching ? undefined : dayLimit).map(([date, items]) => {
           const net = items.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0);
           return (
             <div key={date} className="space-y-1.5">
@@ -137,6 +143,14 @@ export function TransactionList({
             </div>
           );
         })
+      )}
+
+      {!searching && days.size > dayLimit && (
+        <ShowMoreButton
+          expanded={false}
+          onClick={() => setDayLimit((n) => n + DAYS_STEP)}
+          label={`Ver movimientos anteriores (${[...days].slice(dayLimit).reduce((n, [, items]) => n + items.length, 0)} más)`}
+        />
       )}
 
       <p className="px-1 text-center text-xs text-muted-foreground md:hidden">

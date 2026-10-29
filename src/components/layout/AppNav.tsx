@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, LayoutGrid, Menu, PiggyBank, Shapes, X } from "lucide-react";
+import { CreditCard, LayoutGrid, Menu, PiggyBank, Shapes, Users, X } from "lucide-react";
 import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
 import {
   Drawer,
@@ -20,6 +20,7 @@ const ITEMS = [
   { href: "/tarjetas", label: "Tarjetas", hint: "Cuotas y vencimientos", icon: CreditCard },
   { href: "/ahorros", label: "Ahorros", hint: "Metas y dinero reservado", icon: PiggyBank },
   { href: "/categorias", label: "Categorías", hint: "Organiza tus movimientos", icon: Shapes },
+  { href: "/contactos", label: "Contactos", hint: "Personas con las que compartes", icon: Users },
 ] as const;
 
 function useIsActive() {
@@ -28,7 +29,7 @@ function useIsActive() {
 }
 
 /** Navegación en el header (desktop). */
-export function DesktopNav() {
+export function DesktopNav({ contactsBadge }: { contactsBadge?: ReactNode }) {
   const isActive = useIsActive();
   return (
     <nav className="hidden items-center gap-1 md:flex" aria-label="Principal">
@@ -46,6 +47,7 @@ export function DesktopNav() {
         >
           <Icon className="size-4" />
           {label}
+          {href === "/contactos" && contactsBadge}
         </Link>
       ))}
     </nav>
@@ -56,7 +58,7 @@ export function DesktopNav() {
  * Menú lateral (mobile). `footer` llega del servidor con los datos del usuario,
  * así el botón del menú puede prerenderizarse sin esperar la sesión.
  */
-export function SideMenu({ footer }: { footer?: ReactNode }) {
+export function SideMenu({ footer, contactsBadge }: { footer?: ReactNode; contactsBadge?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const isActive = useIsActive();
 
@@ -118,6 +120,7 @@ export function SideMenu({ footer }: { footer?: ReactNode }) {
                       <span className={cn("block text-sm", active && "font-semibold")}>{label}</span>
                       <span className="block truncate text-xs text-muted-foreground">{hint}</span>
                     </span>
+                    {href === "/contactos" && <span className="ml-auto">{contactsBadge}</span>}
                   </Link>
                 );
               })}

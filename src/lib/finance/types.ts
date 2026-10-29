@@ -76,4 +76,26 @@ export type GoalMovement = {
   createdAt: number;
 };
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+/** Datos públicos mínimos de una persona, para mostrarla en contactos. */
+export type Person = {
+  uid: string;
+  name: string;
+  email: string;
+  photo: string | null;
+};
+
+/** Contacto aceptado (copia de los datos de la persona al momento de aceptar). */
+export type Contact = Person & {
+  /** Epoch ms de cuando se aceptó */
+  since: number;
+};
+
+/** Solicitud de contacto pendiente; `from` y `to` son copias de los datos de cada persona. */
+export type ContactRequest = {
+  id: string;
+  from: Person;
+  to: Person;
+  createdAt: number;
+};
+
+export type ActionResult ={ ok: true } | { ok: false; error: string };

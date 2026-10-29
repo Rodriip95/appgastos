@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, LayoutGrid, Menu, PiggyBank, Shapes, Users, X } from "lucide-react";
+import { CreditCard, Handshake, LayoutGrid, Menu, PiggyBank, Shapes, Users, X } from "lucide-react";
 import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
 import {
   Drawer,
@@ -20,6 +20,7 @@ const ITEMS = [
   { href: "/tarjetas", label: "Tarjetas", hint: "Cuotas y vencimientos", icon: CreditCard },
   { href: "/ahorros", label: "Ahorros", hint: "Metas y dinero reservado", icon: PiggyBank },
   { href: "/categorias", label: "Categorías", hint: "Organiza tus movimientos", icon: Shapes },
+  { href: "/compartidos", label: "Compartidos", hint: "Gastos que pagas con otros", icon: Handshake },
   { href: "/contactos", label: "Contactos", hint: "Personas con las que compartes", icon: Users },
 ] as const;
 
@@ -29,7 +30,10 @@ function useIsActive() {
 }
 
 /** Navegación en el header (desktop). */
-export function DesktopNav({ contactsBadge }: { contactsBadge?: ReactNode }) {
+/** Globitos por ruta (p. ej. solicitudes pendientes); llegan del servidor. */
+type Badges = Record<string, ReactNode>;
+
+export function DesktopNav({ badges }: { badges?: Badges }) {
   const isActive = useIsActive();
   return (
     <nav className="hidden items-center gap-1 md:flex" aria-label="Principal">
@@ -38,16 +42,19 @@ export function DesktopNav({ contactsBadge }: { contactsBadge?: ReactNode }) {
           key={href}
           href={href}
           aria-current={isActive(href) ? "page" : undefined}
+          aria-label={label}
+          title={label}
           className={cn(
-            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition",
+            "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm transition lg:px-3",
             isActive(href)
               ? "bg-muted font-medium text-foreground"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
           <Icon className="size-4" />
-          {label}
-          {href === "/contactos" && contactsBadge}
+          {/* En pantallas medianas solo ícono: con seis secciones el texto no entra */}
+          <span className="hidden lg:inline">{label}</span>
+          {badges?.[href]}
         </Link>
       ))}
     </nav>
@@ -58,7 +65,7 @@ export function DesktopNav({ contactsBadge }: { contactsBadge?: ReactNode }) {
  * Menú lateral (mobile). `footer` llega del servidor con los datos del usuario,
  * así el botón del menú puede prerenderizarse sin esperar la sesión.
  */
-export function SideMenu({ footer, contactsBadge }: { footer?: ReactNode; contactsBadge?: ReactNode }) {
+export function SideMenu({ footer, badges }: { footer?: ReactNode; badges?: Badges }) {
   const [open, setOpen] = useState(false);
   const isActive = useIsActive();
 
@@ -120,7 +127,7 @@ export function SideMenu({ footer, contactsBadge }: { footer?: ReactNode; contac
                       <span className={cn("block text-sm", active && "font-semibold")}>{label}</span>
                       <span className="block truncate text-xs text-muted-foreground">{hint}</span>
                     </span>
-                    {href === "/contactos" && <span className="ml-auto">{contactsBadge}</span>}
+                    <span className="ml-auto">{badges?.[href]}</span>
                   </Link>
                 );
               })}

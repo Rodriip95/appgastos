@@ -54,14 +54,14 @@ async function getTemplate(): Promise<ServerTemplate | null> {
 }
 
 /**
- * Flags de un usuario. `uid` y `email` se pasan como señales para poder apuntar un
+ * Flags de un usuario. `uid` y `email` (en minúsculas: las condiciones distinguen mayúsculas) se pasan como señales para poder apuntar un
  * flag a personas concretas desde la consola (condiciones con señales personalizadas).
  */
 export async function getFlagsFor(user: { uid: string; email: string | null }): Promise<Flags> {
   const tpl = await getTemplate();
   if (!tpl) return DEFAULTS;
   try {
-    const config = tpl.evaluate({ randomizationId: user.uid, uid: user.uid, email: user.email ?? "" });
+    const config = tpl.evaluate({ randomizationId: user.uid, uid: user.uid, email: (user.email ?? "").toLowerCase() });
     return {
       dataReset: config.getBoolean(KEYS.dataReset),
       unlimitedStatements: config.getBoolean(KEYS.unlimitedStatements),

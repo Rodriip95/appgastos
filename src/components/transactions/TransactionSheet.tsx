@@ -272,8 +272,10 @@ export function TransactionRow({
     .join(" · ");
   // Las cuotas se borran como compra completa desde el formulario, no con un gesto.
   // Lo compartido tampoco se desliza: se administra desde su espacio.
+  // Lo del negocio también: se edita en Mi negocio.
   const sharedSpaceId = transaction.sharedSpaceId;
-  const swipeable = !transaction.purchaseId && !sharedSpaceId;
+  const business = Boolean(transaction.business);
+  const swipeable = !transaction.purchaseId && !sharedSpaceId && !business;
   const router = useRouter();
 
   function handleDelete() {
@@ -309,6 +311,7 @@ export function TransactionRow({
           if (drag.current?.moved) return;
           if (offset) setOffset(0);
           else if (sharedSpaceId) router.push(`/compartidos/${sharedSpaceId}`);
+          else if (business) router.push("/negocio");
           else openEdit(transaction);
         }}
         onPointerDown={(e) => {

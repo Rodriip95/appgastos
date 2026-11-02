@@ -6,6 +6,7 @@ import { ChevronRight, Inbox, Search, SearchX, X } from "lucide-react";
 import { CategoryIcon } from "@/components/categories/CategoryIcon";
 import { ShowMoreButton } from "@/components/common/CollapsibleList";
 import { TransactionRow } from "@/components/transactions/TransactionSheet";
+import { BUSINESS_KEY, businessCategory } from "@/lib/finance/business";
 import { cardOf, statementKey, statementTotal } from "@/lib/finance/cards";
 import { formatTotals } from "@/lib/finance/currency";
 import { formatDayLabel, formatMoney, formatMonthShort } from "@/lib/finance/format";
@@ -71,8 +72,14 @@ export function TransactionList({
   }
 
   const byId = new Map(categories.map((c) => [c.id, c]));
-  const categoryOf = (t: Transaction) => (t.categoryId && byId.get(t.categoryId)) || null;
-  const filterCategory = filterKey && filterKey !== "none" ? byId.get(filterKey) : null;
+  const categoryOf = (t: Transaction) =>
+    t.business ? businessCategory(t.type) : (t.categoryId && byId.get(t.categoryId)) || null;
+  const filterCategory =
+    filterKey === BUSINESS_KEY
+      ? businessCategory("income")
+      : filterKey && filterKey !== "none"
+        ? byId.get(filterKey)
+        : null;
 
   // Busca en descripción, categoría y subcategoría, sin importar tildes ni mayúsculas.
   const q = normalize(query.trim());

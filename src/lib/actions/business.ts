@@ -6,6 +6,8 @@ import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { DOC_ID_RE, userCollection } from "@/lib/data/collections";
 import {
+  EXPENSE_CONCEPTS,
+  normalizeName,
   ORDER_PRIORITIES,
   ORDER_STATUSES,
   orderBalance,
@@ -19,6 +21,8 @@ const quantity = z.number("Ingresa una cantidad válida").positive("La cantidad 
 const idSchema = z.string().regex(DOC_ID_RE);
 
 const orderSchema = z.object({
+  /** Cliente elegido de la libreta; sin él, se busca por nombre o se crea */
+  clientId: idSchema.nullish(),
   client: z.string().trim().min(1, "¿Para quién es el pedido?").max(60, "Nombre muy largo"),
   phone: z.string().trim().max(30, "Teléfono muy largo").default(""),
   detail: z.string().trim().min(1, "Cuenta qué lleva el pedido").max(500, "Detalle muy largo"),
@@ -34,7 +38,6 @@ const paymentSchema = z.object({
   amount: money,
   date: z.iso.date("Fecha inválida"),
   note: z.string().trim().max(120, "Descripción muy larga").default(""),
-  addToSummary: z.boolean(),
 });
 export type PaymentInput = z.input<typeof paymentSchema>;
 
@@ -43,6 +46,7 @@ const materialSchema = z.object({
   unit: z.string().trim().min(1, "Indica la unidad").max(12, "Unidad muy larga"),
   unitPrice: z.number("Ingresa un precio válido").min(0, "Precio inválido").max(1e12),
   stock: z.number("Ingresa un stock válido").min(-1e9).max(1e9),
+  minStock: z.number("Ingresa un mínimo válido").min(0, "El mínimo no puede ser negativo").max(1e9).default(0),
 });
 export type MaterialInput = z.input<typeof materialSchema>;
 
@@ -51,8 +55,30 @@ const purchaseSchema = z.object({
   qty: quantity,
   total: money,
   date: z.iso.date("Fecha inválida"),
+  supplier: z.string().trim().max(60, "Proveedor muy largo").default(""),
 });
 export type PurchaseInput = z.input<typeof purchaseSchema>;
+
+const clientSchema = z.object({
+  name: z.string().trim().min(1, "¿Cómo se llama?").max(60, "Nombre muy largo"),
+  phone: z.string().trim().max(30, "Teléfono muy largo").default(""),
+  note: z.string().trim().max(200, "Nota muy larga").default(""),
+});
+export type ClientInput = z.input<typeof clientSchema>;
+
+const expenseSchema = z.object({
+  concept: z.enum(EXPENSE_CONCEPTS),
+  amount: money,
+  date: z.iso.date("Fecha inválida"),
+  supplier: z.string().trim().max(60, "Proveedor muy largo").default(""),
+  note: z.string().trim().max(120, "Descripción muy larga").default(""),
+});
+export type ExpenseInput = z.input<typeof expenseSchema>;
+
+const settingsSchema = z.object({
+  targetMargin: z.number("Ingresa un margen válido").int().min(1, "Mínimo 1%").max(95, "Máximo 95%"),
+});
+export type SettingsInput = z.input<typeof settingsSchema>;
 
 const fail = (error: string): ActionResult => ({ ok: false, error });
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -82,7 +108,18 @@ export async function saveOrder(input: OrderInput, id?: string): Promise<ActionR
   const parsed = orderSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
   if (id !== undefined && !idSchema.safeParse(id).success) return fail("Pedido inválido");
-  const { materials, ...fields } = parsed.data;
+  const { materials, clientId: pickedClient, ...rest } = parsed.data;
+
+  let client: { clientId: string; client: string; phone: string };
+  try {
+    const resolved = await resolveClient(uid, pickedClient ?? null, rest.client, rest.phone);
+    if (!resolved) return fail("El cliente ya no existe");
+    client = resolved;
+  } catch (error) {
+    console.error("[business] client:", error);
+    return fail("No pudimos guardar el pedido");
+  }
+  const fields = { ...rest, ...client };
 
   const orders = userCollection(uid, "orders");
   const materialsCol = userCollection(uid, "materials");
@@ -133,6 +170,33 @@ export async function saveOrder(input: OrderInput, id?: string): Promise<ActionR
   }
   refresh();
   return { ok: true };
+}
+
+/**
+ * Cliente del pedido: el elegido o, si no se eligió, el de la libreta con el mismo nombre
+ * (sin importar mayúsculas ni tildes); si no hay, se crea. Un teléfono nuevo se guarda en el cliente.
+ */
+async function resolveClient(uid: string, clientId: string | null, name: string, phone: string) {
+  const col = userCollection(uid, "clients");
+  let ref = clientId ? col.doc(clientId) : null;
+  let current = ref ? await ref.get() : null;
+  if (current && !current.exists) return null;
+  if (!ref) {
+    const key = normalizeName(name);
+    const all = await col.get();
+    const match = all.docs.find((d) => normalizeName(d.get("name") ?? "") === key);
+    if (match) {
+      ref = match.ref;
+      current = match;
+    } else {
+      ref = col.doc();
+      await ref.set({ name, phone, note: "", createdAt: FieldValue.serverTimestamp() });
+      return { clientId: ref.id, client: name, phone };
+    }
+  }
+  const savedPhone: string = current?.get("phone") ?? "";
+  if (phone && phone !== savedPhone) await ref.update({ phone });
+  return { clientId: ref.id, client: (current?.get("name") as string) || name, phone: phone || savedPhone };
 }
 
 /** Cambia el estado; al entrar o salir de "Entregado" se descuenta o devuelve el stock. */
@@ -186,17 +250,16 @@ export async function deleteOrder(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Registra una seña o pago; `paid` se actualiza en la misma transacción. */
+/** Registra una seña o pago (suma como ingreso en la home); `paid` se actualiza en la misma transacción. */
 export async function addOrderPayment(input: PaymentInput): Promise<ActionResult> {
   const { uid } = await verifySession();
   const parsed = paymentSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
-  const { orderId, amount, date, note, addToSummary } = parsed.data;
+  const { orderId, amount, date, note } = parsed.data;
   const month = date.slice(0, 7);
 
   const orderRef = userCollection(uid, "orders").doc(orderId);
   const paymentRef = userCollection(uid, "orderPayments").doc();
-  const txRef = userCollection(uid, "transactions").doc();
   try {
     const error = await orderRef.firestore.runTransaction(async (tx) => {
       const order = await tx.get(orderRef);
@@ -212,23 +275,11 @@ export async function addOrderPayment(input: PaymentInput): Promise<ActionResult
         date,
         month,
         note,
-        transactionId: addToSummary ? txRef.id : null,
+        // Los cobros suman solos a la home; `transactionId` queda solo en los pagos viejos.
+        transactionId: null,
         createdAt: FieldValue.serverTimestamp(),
       });
       tx.update(orderRef, { paid: round2(paid + amount) });
-      if (addToSummary) {
-        tx.set(txRef, {
-          type: "income",
-          amount,
-          date,
-          month,
-          categoryId: null,
-          subcategoryId: null,
-          note: `Pedido de ${client}`,
-          recurring: false,
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      }
       return null;
     });
     if (error) return fail(error);
@@ -310,7 +361,7 @@ export async function addMaterialPurchase(input: PurchaseInput): Promise<ActionR
   const { uid } = await verifySession();
   const parsed = purchaseSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
-  const { materialId, qty, total, date } = parsed.data;
+  const { materialId, qty, total, date, supplier } = parsed.data;
 
   const materialRef = userCollection(uid, "materials").doc(materialId);
   const purchaseRef = userCollection(uid, "materialPurchases").doc();
@@ -325,6 +376,7 @@ export async function addMaterialPurchase(input: PurchaseInput): Promise<ActionR
         total,
         date,
         month: date.slice(0, 7),
+        supplier,
         createdAt: FieldValue.serverTimestamp(),
       });
       tx.update(materialRef, {
@@ -357,6 +409,107 @@ export async function deleteMaterialPurchase(id: string): Promise<ActionResult> 
   } catch (error) {
     console.error("[business] delete purchase:", error);
     return fail("No pudimos eliminar la compra");
+  }
+  refresh();
+  return { ok: true };
+}
+
+/** Al cambiar nombre o teléfono, los pedidos del cliente se actualizan también. */
+export async function saveClient(input: ClientInput, id?: string): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  const parsed = clientSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
+  if (id !== undefined && !idSchema.safeParse(id).success) return fail("Cliente inválido");
+
+  const col = userCollection(uid, "clients");
+  try {
+    const all = await col.get();
+    const key = normalizeName(parsed.data.name);
+    if (all.docs.some((d) => d.id !== id && normalizeName(d.get("name") ?? "") === key)) {
+      return fail("Ya tienes un cliente con ese nombre");
+    }
+    if (id) {
+      const ref = col.doc(id);
+      if (!all.docs.some((d) => d.id === id)) return fail("El cliente ya no existe");
+      const orders = await userCollection(uid, "orders").where("clientId", "==", id).get();
+      const batch = col.firestore.batch();
+      batch.update(ref, { ...parsed.data, updatedAt: FieldValue.serverTimestamp() });
+      for (const o of orders.docs) batch.update(o.ref, { client: parsed.data.name, phone: parsed.data.phone });
+      await batch.commit();
+    } else {
+      await col.add({ ...parsed.data, createdAt: FieldValue.serverTimestamp() });
+    }
+  } catch (error) {
+    console.error("[business] save client:", error);
+    return fail("No pudimos guardar el cliente");
+  }
+  refresh();
+  return { ok: true };
+}
+
+/** Solo se elimina un cliente sin pedidos (los pedidos guardan quién los hizo). */
+export async function deleteClient(id: string): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  if (!idSchema.safeParse(id).success) return fail("Cliente inválido");
+  try {
+    const orders = await userCollection(uid, "orders").where("clientId", "==", id).limit(1).get();
+    if (!orders.empty) return fail("Tiene pedidos: elimínalos primero");
+    await userCollection(uid, "clients").doc(id).delete();
+  } catch (error) {
+    console.error("[business] delete client:", error);
+    return fail("No pudimos eliminar el cliente");
+  }
+  refresh();
+  return { ok: true };
+}
+
+/** Gasto del negocio que no es material (envíos, packaging…); resta en el negocio y en la home. */
+export async function saveBusinessExpense(input: ExpenseInput, id?: string): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  const parsed = expenseSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
+  if (id !== undefined && !idSchema.safeParse(id).success) return fail("Gasto inválido");
+
+  const col = userCollection(uid, "businessExpenses");
+  const data = { ...parsed.data, month: parsed.data.date.slice(0, 7) };
+  try {
+    if (id) {
+      const ref = col.doc(id);
+      if (!(await ref.get()).exists) return fail("El gasto ya no existe");
+      await ref.update({ ...data, updatedAt: FieldValue.serverTimestamp() });
+    } else {
+      await col.add({ ...data, createdAt: FieldValue.serverTimestamp() });
+    }
+  } catch (error) {
+    console.error("[business] save expense:", error);
+    return fail("No pudimos guardar el gasto");
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function deleteBusinessExpense(id: string): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  if (!idSchema.safeParse(id).success) return fail("Gasto inválido");
+  try {
+    await userCollection(uid, "businessExpenses").doc(id).delete();
+  } catch (error) {
+    console.error("[business] delete expense:", error);
+    return fail("No pudimos eliminar el gasto");
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function saveBusinessSettings(input: SettingsInput): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  const parsed = settingsSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
+  try {
+    await userCollection(uid, "settings").doc("business").set(parsed.data, { merge: true });
+  } catch (error) {
+    console.error("[business] settings:", error);
+    return fail("No pudimos guardar el margen");
   }
   refresh();
   return { ok: true };

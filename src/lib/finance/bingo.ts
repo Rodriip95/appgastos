@@ -1,4 +1,4 @@
-import type { Order } from "@/lib/finance/business";
+import type { Material, Order } from "@/lib/finance/business";
 import type { UpcomingDue } from "@/lib/finance/cards";
 import { formatTotals } from "@/lib/finance/currency";
 import { formatMoney, formatMonth, formatShortDate, shiftDay, shiftMonth } from "@/lib/finance/format";
@@ -41,6 +41,8 @@ export type BingoContext = {
   goals: Goal[];
   /** Pedidos abiertos con entrega en la próxima semana, los más cercanos primero */
   deliveries: Order[];
+  /** Materiales del negocio con stock bajo */
+  lowStock: Material[];
 };
 
 type Candidate = BingoMessage & { priority: number };
@@ -136,7 +138,7 @@ function deliveryMessage(deliveries: Order[], today: string): Candidate {
     tone: urgent ? "alert" : "warn",
     variant: "hello",
     text: `¡Guau! Olfateé una entrega: ${when}${others > 0 ? ` (y ${others} más esta semana)` : ""}.`,
-    href: "/emprendimiento",
+    href: "/negocio",
     cta: "Ver pedidos",
     dismissible: true,
   };
@@ -153,8 +155,21 @@ export function bingoMessages(ctx: BingoContext, limit = 4): BingoMessage[] {
   // --- Vencimientos de tarjetas ---
   if (ctx.dues.length > 0) out.push(dueMessage(ctx.dues, today));
 
-  // --- Entregas del emprendimiento ---
+  // --- Mi negocio: entregas y stock bajo ---
   if (ctx.deliveries.length > 0) out.push(deliveryMessage(ctx.deliveries, today));
+  if (ctx.lowStock.length > 0) {
+    const [first, ...rest] = ctx.lowStock;
+    out.push({
+      id: `low-stock:${ctx.lowStock.map((m) => `${m.id}:${m.stock}`).join("|")}`,
+      priority: 34,
+      tone: "warn",
+      variant: "hello",
+      text: `Te queda poco de ${first.name} (${first.stock} ${first.unit})${rest.length > 0 ? ` y de ${rest.length} material${rest.length > 1 ? "es" : ""} más` : ""}. ¿Lo reponemos?`,
+      href: "/negocio?t=stock",
+      cta: "Ver stock",
+      dismissible: true,
+    });
+  }
 
   // --- Empezar: sin categorías ---
   if (ctx.categories.length === 0) {

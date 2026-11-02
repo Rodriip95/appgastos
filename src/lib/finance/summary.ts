@@ -1,3 +1,4 @@
+import { BUSINESS_KEY, businessCategory } from "@/lib/finance/business";
 import { toArs } from "@/lib/finance/currency";
 import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
 
@@ -54,7 +55,10 @@ export function summarizeMonth(
     byCurrency[tx.currency][tx.type] += tx.amount;
     if (tx.currency === "USD") hasUsd = true;
 
-    const category = (tx.categoryId && byId.get(tx.categoryId)) || null;
+    // Lo de Mi negocio va en su propia fila, como una categoría más.
+    const category = tx.business
+      ? businessCategory(tx.type)
+      : (tx.categoryId && byId.get(tx.categoryId)) || null;
     const card = cardOf(tx);
     if (card) {
       const key = `card:${card.id}`;
@@ -92,7 +96,9 @@ export function summarizeMonth(
     const card = cardOf(tx);
     const key = card
       ? `expense:card:${card.id}`
-      : `${tx.type}:${(tx.categoryId && byId.has(tx.categoryId) && tx.categoryId) || "none"}`;
+      : tx.business
+        ? `${tx.type}:${BUSINESS_KEY}`
+        : `${tx.type}:${(tx.categoryId && byId.has(tx.categoryId) && tx.categoryId) || "none"}`;
     prevByKey.set(key, (prevByKey.get(key) ?? 0) + toArs(tx));
   }
 

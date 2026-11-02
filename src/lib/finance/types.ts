@@ -52,6 +52,8 @@ export type Transaction = {
   installment: { n: number; total: number } | null;
   /** Si viene de un gasto compartido (solo mi parte, no editable): id del espacio */
   sharedSpaceId: string | null;
+  /** Cobro o gasto de Mi negocio mostrado en la home (solo lectura, se edita en /negocio) */
+  business?: boolean;
   createdAt: number;
 };
 

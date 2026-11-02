@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
     // Resúmenes de tarjeta (PDF/imagen) que se leen con IA: hasta 4 MB + margen del multipart.
     serverActions: { bodySizeLimit: "5mb" },
   },
+  // El módulo Emprendimiento ahora es Mi negocio.
+  async redirects() {
+    return [{ source: "/emprendimiento", destination: "/negocio", permanent: true }];
+  },
   // Permite que el popup de Google se comunique con la ventana (evita el aviso COOP)
   async headers() {
     return [

@@ -4,7 +4,7 @@ import { io } from "next/cache";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { DashboardView } from "@/components/dashboard/DashboardView";
 import { verifySession } from "@/lib/auth/session";
-import { getNearOrders } from "@/lib/data/business";
+import { getBusinessHomeTransactions, getLowStockMaterials, getNearOrders } from "@/lib/data/business";
 import { getCards } from "@/lib/data/cards";
 import { getPaidStatements } from "@/lib/data/card-payments";
 import { getCategories } from "@/lib/data/categories";
@@ -23,7 +23,10 @@ import { BALANCE_VIEW_COOKIE, resolveBalanceView, type BalanceView } from "@/lib
 import { isMonthKey, shiftMonth, todayKey } from "@/lib/finance/format";
 import type { Transaction } from "@/lib/finance/types";
 
-/** Mis movimientos y los de mi parte compartida, del más reciente al más antiguo. */
+/** El mes completo como rango de fechas (para los cobros y gastos del negocio). */
+const monthRange = (month: string) => ({ from: `${month}-01`, to: `${month}-31` });
+
+/** Mis movimientos, mi parte compartida y lo del negocio, del más reciente al más antiguo. */
 const newestFirst = (list: Transaction[]) =>
   list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 
@@ -65,6 +68,9 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     nearOrders,
     usdRate,
     paidStatements,
+    business,
+    prevBusiness,
+    lowStock,
   ] = await Promise.all([
     getCategories(),
     getCards(),
@@ -80,6 +86,9 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     getNearOrders(today),
     getUsdReference().then(getUsdRate),
     getPaidStatements(),
+    getBusinessHomeTransactions(monthRange(month)),
+    getBusinessHomeTransactions(monthRange(shiftMonth(month, -1))),
+    getLowStockMaterials(),
   ]);
   // Movimientos en dólares sin cotización guardada (la API no respondió al cargarlos): se usa la de hoy.
   const withRate = (list: Transaction[]) => fillRates(list, usdRate?.rate ?? null);
@@ -89,11 +98,12 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     <DashboardView
       categories={categories}
       cards={cards}
-      transactions={withRate(newestFirst([...transactions, ...shared.transactions]))}
-      prevTransactions={withRate([...prevTransactions, ...prevShared.transactions])}
+      transactions={withRate(newestFirst([...transactions, ...shared.transactions, ...business]))}
+      prevTransactions={withRate([...prevTransactions, ...prevShared.transactions, ...prevBusiness])}
       upcomingCardTransactions={upcomingCardTransactions}
       firstMonth={firstMonth}
       nearOrders={nearOrders}
+      lowStock={lowStock}
       futureMonths={futureMonths}
       goals={goals}
       goalMovements={goalMovements}
@@ -113,13 +123,14 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
 async function getRange(view: BalanceView, today: string) {
   if (view.kind === "month") return null;
   const [from, to] = view.kind === "period" ? [view.from, view.to] : [null, today];
-  const [transactions, goalMovements, shared] = await Promise.all([
+  const [transactions, goalMovements, shared, business] = await Promise.all([
     getRangeTransactions(from, to),
     getRangeGoalMovements(from, to),
     getSharedRangeSummary(from, to),
+    getBusinessHomeTransactions({ from, to }),
   ]);
   return {
-    transactions: newestFirst([...transactions, ...shared.transactions]),
+    transactions: newestFirst([...transactions, ...shared.transactions, ...business]),
     goalMovements: [...goalMovements, ...shared.goalMovements],
   };
 }

@@ -18,7 +18,19 @@ function remember(view: BalanceView) {
   document.cookie = `${BALANCE_VIEW_COOKIE}=${value}; path=/; max-age=31536000; samesite=lax`;
 }
 
-export function BalanceViewSwitcher({ view, today }: { view: BalanceView; today: string }) {
+/**
+ * Mes / Período / General. En la home (`basePath` "/") la elección se recuerda; en otras
+ * páginas (Mi negocio) solo cambia la URL.
+ */
+export function BalanceViewSwitcher({
+  view,
+  today,
+  basePath = "/",
+}: {
+  view: BalanceView;
+  today: string;
+  basePath?: string;
+}) {
   const period: BalanceView =
     view.kind === "period" ? view : { kind: "period", ...defaultPeriod(today) };
   const tabs: { label: string; target: BalanceView }[] = [
@@ -34,9 +46,9 @@ export function BalanceViewSwitcher({ view, today }: { view: BalanceView; today:
         return (
           <Link
             key={label}
-            href={`/?${balanceViewQuery(target)}`}
+            href={`${basePath}?${balanceViewQuery(target)}`}
             scroll={false}
-            onClick={() => remember(target)}
+            onClick={() => basePath === "/" && remember(target)}
             aria-current={active ? "page" : undefined}
             className={cn(
               "rounded-full py-1.5 text-center text-sm font-medium transition",
@@ -52,15 +64,25 @@ export function BalanceViewSwitcher({ view, today }: { view: BalanceView; today:
 }
 
 /** Desde/hasta del período, con atajos para los rangos más comunes. */
-export function PeriodPicker({ from, to, today }: { from: string; to: string; today: string }) {
+export function PeriodPicker({
+  from,
+  to,
+  today,
+  basePath = "/",
+}: {
+  from: string;
+  to: string;
+  today: string;
+  basePath?: string;
+}) {
   const router = useRouter();
   const currentMonth = today.slice(0, 7);
 
   function go(nextFrom: string, nextTo: string) {
     if (!nextFrom || !nextTo) return;
     const view: BalanceView = { kind: "period", from: nextFrom, to: nextTo };
-    remember(view);
-    router.replace(`/?${balanceViewQuery(view)}`, { scroll: false });
+    if (basePath === "/") remember(view);
+    router.replace(`${basePath}?${balanceViewQuery(view)}`, { scroll: false });
   }
 
   const presets = [

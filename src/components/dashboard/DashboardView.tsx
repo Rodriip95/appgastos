@@ -13,7 +13,7 @@ import {
   TransactionSheetProvider,
 } from "@/components/transactions/TransactionSheet";
 import { bingoMessages } from "@/lib/finance/bingo";
-import { upcomingDeliveries, type Order } from "@/lib/finance/business";
+import { upcomingDeliveries, type Material, type Order } from "@/lib/finance/business";
 import { countedTransactions, upcomingDues } from "@/lib/finance/cards";
 import { netSaved } from "@/lib/finance/goals";
 import { balanceViewQuery, type BalanceView } from "@/lib/finance/balance-view";
@@ -37,8 +37,10 @@ export type DashboardData = {
   /** Cuotas de tarjeta desde el mes en curso en adelante */
   upcomingCardTransactions: Transaction[];
   firstMonth: string | null;
-  /** Pedidos del emprendimiento con entrega cercana */
+  /** Pedidos de Mi negocio con entrega cercana */
   nearOrders: Order[];
+  /** Materiales de Mi negocio con stock bajo */
+  lowStock: Material[];
   /** Meses posteriores al actual con movimientos */
   futureMonths: string[];
   goals: Goal[];
@@ -70,6 +72,7 @@ export function DashboardView({
   upcomingCardTransactions,
   firstMonth,
   nearOrders,
+  lowStock,
   futureMonths,
   goals,
   goalMovements,
@@ -107,6 +110,7 @@ export function DashboardView({
         pendingRecurring: pending,
         goals,
         deliveries: upcomingDeliveries(nearOrders, today),
+        lowStock,
       })
     : [];
 

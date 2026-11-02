@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import {
   AlertTriangle,
+  CalendarPlus,
+  Clock,
   MessageCircle,
   Package,
   Pencil,
@@ -22,8 +24,10 @@ import {
   OrderForm,
   PaymentForm,
   PurchaseForm,
+  ServiceForm,
   SettingsForm,
 } from "@/components/business/BusinessForms";
+import { MonthCalendar } from "@/components/business/MonthCalendar";
 import { BalanceViewSwitcher, PeriodPicker } from "@/components/dashboard/BalanceViewSwitcher";
 import { MonthSwitcher } from "@/components/dashboard/MonthSwitcher";
 import { Button } from "@/components/ui/button";
@@ -39,6 +43,11 @@ import {
   businessMetrics,
   clientStats,
   CONCEPT_LABEL,
+  dayAgenda,
+  monthMarks,
+  orderTitle,
+  statusLabel,
+  timeRange,
   isLowStock,
   isOpen,
   materialsCost,
@@ -47,7 +56,6 @@ import {
   orderMargin,
   PRIORITY_LABEL,
   sortOrders,
-  STATUS_LABEL,
   stockValue,
   whatsappHref,
   type BusinessData,
@@ -59,16 +67,26 @@ import {
   type DateRange,
   type Material,
   type Order,
+  type OrderKind,
   type OrderPayment,
   type OrderStatus,
+  type Service,
 } from "@/lib/finance/business";
-import { formatMoney, formatMonth, formatMonthShort, formatShortDate, shiftMonth } from "@/lib/finance/format";
+import {
+  formatMoney,
+  formatMonth,
+  formatMonthShort,
+  formatShortDate,
+  shiftMonth,
+  todayKey,
+} from "@/lib/finance/format";
 import { changePct } from "@/lib/finance/summary";
 import type { ActionResult } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 const TAB_LABEL: Record<BusinessTab, string> = {
   resumen: "Resumen",
+  calendario: "Calendario",
   pedidos: "Pedidos",
   clientes: "Clientes",
   stock: "Stock",
@@ -87,7 +105,8 @@ type Props = BusinessData & {
 };
 
 type Sheet =
-  | { kind: "order"; order?: Order; client?: Client }
+  | { kind: "order"; order?: Order; client?: Client; orderKind?: OrderKind; date?: string }
+  | { kind: "service"; service?: Service }
   | { kind: "payment"; order: Order }
   | { kind: "material"; material?: Material }
   | { kind: "purchase"; material: Material }
@@ -97,6 +116,7 @@ type Sheet =
 
 const SHEET_TITLE: Record<Sheet["kind"], string> = {
   order: "Pedido",
+  service: "Servicio",
   payment: "Registrar pago",
   material: "Material",
   purchase: "Compra",
@@ -107,7 +127,7 @@ const SHEET_TITLE: Record<Sheet["kind"], string> = {
 
 /** Mi negocio. Los datos llegan de `(app)/negocio/page.tsx`. */
 export function BusinessView(props: Props) {
-  const { orders, materials, payments, purchases, expenses, clients, settings, today, month, view, range } = props;
+  const { orders, materials, services, payments, purchases, expenses, clients, settings, today, month, view, range } = props;
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [tab, setTab] = useState<BusinessTab>(props.initialTab);
   const close = () => setSheet(null);
@@ -166,19 +186,22 @@ export function BusinessView(props: Props) {
 
       <ProfitCard metrics={metrics} prev={prevMetrics} prevMonth={prevMonth} />
 
-      <div className="grid grid-cols-2 gap-2">
-        <Button size="lg" onClick={() => setSheet({ kind: "order" })}>
-          <Plus /> Nuevo pedido
+      <div className="grid grid-cols-3 gap-2">
+        <Button size="lg" className="px-2" onClick={() => setSheet({ kind: "order" })}>
+          <Plus /> Pedido
         </Button>
-        <Button size="lg" variant="outline" onClick={() => setSheet({ kind: "expense" })}>
-          <Receipt /> Registrar gasto
+        <Button size="lg" className="px-2" onClick={() => setSheet({ kind: "order", orderKind: "appointment" })}>
+          <CalendarPlus /> Turno
+        </Button>
+        <Button size="lg" variant="outline" className="px-2" onClick={() => setSheet({ kind: "expense" })}>
+          <Receipt /> Gasto
         </Button>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as BusinessTab)} className="gap-4">
-        <TabsList className="w-full">
+        <TabsList className="w-full justify-start overflow-x-auto [scrollbar-width:none]">
           {BUSINESS_TABS.map((t) => (
-            <TabsTrigger key={t} value={t} className="px-1 text-xs sm:text-sm">
+            <TabsTrigger key={t} value={t} className="shrink-0 px-2 text-xs sm:text-sm">
               {TAB_LABEL[t]}
             </TabsTrigger>
           ))}
@@ -195,9 +218,20 @@ export function BusinessView(props: Props) {
           />
         </TabsContent>
 
+        <TabsContent value="calendario" className="min-w-0 space-y-3">
+          <CalendarTab
+            orders={orders}
+            payments={payments}
+            today={today}
+            onNew={(date) => setSheet({ kind: "order", orderKind: "appointment", date })}
+            onEdit={(order) => setSheet({ kind: "order", order })}
+            onPay={(order) => setSheet({ kind: "payment", order })}
+          />
+        </TabsContent>
+
         <TabsContent value="pedidos" className="min-w-0 space-y-3">
           <OrdersTab
-            orders={orders}
+            orders={orders.filter((o) => o.kind === "order")}
             payments={payments}
             today={today}
             onEdit={(order) => setSheet({ kind: "order", order })}
@@ -217,6 +251,9 @@ export function BusinessView(props: Props) {
 
         <TabsContent value="stock" className="min-w-0 space-y-3">
           <StockTab
+            services={services}
+            onAddService={() => setSheet({ kind: "service" })}
+            onEditService={(service) => setSheet({ kind: "service", service })}
             materials={materials}
             purchases={purchases}
             onAdd={() => setSheet({ kind: "material" })}
@@ -243,14 +280,18 @@ export function BusinessView(props: Props) {
         {sheet?.kind === "order" && (
           <OrderForm
             order={sheet.order}
+            kind={sheet.orderKind}
             presetClient={sheet.client}
+            presetDate={sheet.date}
             materials={materials}
+            services={services}
             clients={clients}
             targetMargin={settings.targetMargin}
             onDone={close}
           />
         )}
         {sheet?.kind === "payment" && <PaymentForm order={sheet.order} onDone={close} />}
+        {sheet?.kind === "service" && <ServiceForm service={sheet.service} onDone={close} />}
         {sheet?.kind === "material" && <MaterialForm material={sheet.material} onDone={close} />}
         {sheet?.kind === "purchase" && (
           <PurchaseForm material={sheet.material} suppliers={suppliers} onDone={close} />
@@ -270,8 +311,12 @@ const inRange = (date: string, { from, to }: DateRange) => (!from || date >= fro
 function sheetTitle(sheet: Sheet | null): string {
   if (!sheet) return "Mi negocio";
   switch (sheet.kind) {
-    case "order":
-      return sheet.order ? "Editar pedido" : "Nuevo pedido";
+    case "order": {
+      const turn = (sheet.order?.kind ?? sheet.orderKind) === "appointment";
+      return `${sheet.order ? "Editar" : "Nuevo"} ${turn ? "turno" : "pedido"}`;
+    }
+    case "service":
+      return sheet.service ? "Editar servicio" : "Nuevo servicio";
     case "material":
       return sheet.material ? "Editar material" : "Nuevo material";
     case "purchase":
@@ -525,6 +570,74 @@ function OrdersTab({
   );
 }
 
+function CalendarTab({
+  orders,
+  payments,
+  today,
+  onNew,
+  onEdit,
+  onPay,
+}: {
+  orders: Order[];
+  payments: OrderPayment[];
+  today: string;
+  onNew: (date: string) => void;
+  onEdit: (order: Order) => void;
+  onPay: (order: Order) => void;
+}) {
+  const [selected, setSelected] = useState(today);
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const agenda = dayAgenda(orders, selected);
+  const open = agenda.filter(isOpen);
+  const turns = open.filter((o) => o.kind === "appointment").length;
+  const deliveries = open.length - turns;
+  const summary = [
+    turns ? `${turns} ${turns === 1 ? "turno" : "turnos"}` : null,
+    deliveries ? `${deliveries} ${deliveries === 1 ? "entrega" : "entregas"}` : null,
+  ].filter(Boolean);
+
+  return (
+    <>
+      <MonthCalendar
+        month={month}
+        today={today}
+        selected={selected}
+        marks={monthMarks(orders, month)}
+        onSelect={(date) => {
+          setSelected(date);
+          setMonth(date.slice(0, 7));
+        }}
+        onMonth={setMonth}
+      />
+
+      <div className="flex items-center justify-between gap-3 pt-1">
+        <div className="min-w-0">
+          <h2 className="font-semibold">
+            {selected === today ? "Hoy" : formatShortDate(selected).replace(/^\w/, (c) => c.toUpperCase())}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {summary.length ? summary.join(" y ") : "Nada agendado"}
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => onNew(selected)}>
+          <CalendarPlus /> Turno
+        </Button>
+      </div>
+
+      {agenda.map((o) => (
+        <OrderCard
+          key={o.id}
+          order={o}
+          payments={payments.filter((p) => p.orderId === o.id)}
+          today={today}
+          onEdit={() => onEdit(o)}
+          onPay={() => onPay(o)}
+        />
+      ))}
+    </>
+  );
+}
+
 function ClientsTab({
   clients,
   orders,
@@ -607,12 +720,18 @@ function ClientsTab({
 }
 
 function StockTab({
+  services,
+  onAddService,
+  onEditService,
   materials,
   purchases,
   onAdd,
   onEdit,
   onBuy,
 }: {
+  services: Service[];
+  onAddService: () => void;
+  onEditService: (service: Service) => void;
   materials: Material[];
   purchases: BusinessData["purchases"];
   onAdd: () => void;
@@ -624,7 +743,41 @@ function StockTab({
   return (
     <>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Valor del stock: {formatMoney(stockValue(materials))}</p>
+        <div className="min-w-0">
+          <h2 className="font-semibold">Servicios</h2>
+          <p className="text-xs text-muted-foreground">Sin stock: los eliges al agendar un turno.</p>
+        </div>
+        <Button variant="outline" onClick={onAddService}>
+          <Plus /> Servicio
+        </Button>
+      </div>
+      {services.length > 0 && (
+        <ul className="divide-y rounded-3xl border bg-card">
+          {services.map((sv) => (
+            <li key={sv.id}>
+              <button
+                type="button"
+                onClick={() => onEditService(sv)}
+                className="flex w-full items-center gap-2 px-4 py-3 text-left transition hover:bg-muted/50"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{sv.name}</span>
+                {sv.duration > 0 && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="size-3" /> {sv.duration} min
+                  </span>
+                )}
+                <span className="text-sm font-medium tabular-nums">{formatMoney(sv.price)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <div className="min-w-0">
+          <h2 className="font-semibold">Materiales</h2>
+          <p className="text-xs text-muted-foreground">Valor del stock: {formatMoney(stockValue(materials))}</p>
+        </div>
         <Button onClick={onAdd}>
           <Plus /> Material
         </Button>
@@ -806,6 +959,9 @@ function UndoButton({ label, action }: { label: string; action: () => Promise<Ac
   );
 }
 
+/** Fecha (YYYY-MM-DD) de un timestamp, en la zona horaria de la app. */
+const createdKey = (millis: number) => todayKey(new Date(millis));
+
 const PRIORITY_CLASS = {
   high: "bg-destructive/10 text-destructive",
   medium: "bg-brand-orange/15 text-foreground",
@@ -829,7 +985,9 @@ function OrderCard({
   const whatsapp = whatsappHref(order.phone);
   const balance = orderBalance(order);
   const cost = materialsCost(order);
+  const turn = order.kind === "appointment";
   const late = isOpen(order) && order.deliveryDate < today;
+  const hours = timeRange(order);
 
   function changeStatus(status: OrderStatus) {
     startTransition(async () => {
@@ -844,15 +1002,20 @@ function OrderCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="truncate font-semibold">{order.client}</h3>
-            {isOpen(order) && (
+            {turn && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Turno</span>
+            )}
+            {!turn && isOpen(order) && (
               <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", PRIORITY_CLASS[order.priority])}>
                 {PRIORITY_LABEL[order.priority]}
               </span>
             )}
           </div>
           <p className={cn("text-xs text-muted-foreground", late && "font-medium text-destructive")}>
-            {late ? "Atrasado: " : "Entrega: "}
-            {formatShortDate(order.deliveryDate)}
+            {turn
+              ? `${late ? "Quedó abierto: " : "Turno: "}${formatShortDate(order.deliveryDate)}${hours ? ` · ${hours}` : ""}`
+              : `${late ? "Atrasado: " : "Entrega: "}${formatShortDate(order.deliveryDate)}`}
+            {order.createdAt > 0 && ` · Tomado el ${formatShortDate(createdKey(order.createdAt))}`}
           </p>
         </div>
         {whatsapp && (
@@ -866,12 +1029,15 @@ function OrderCard({
             <MessageCircle className="size-4" />
           </a>
         )}
-        <IconButton label={`Editar pedido de ${order.client}`} onClick={onEdit}>
+        <IconButton label={`Editar ${turn ? "turno" : "pedido"} de ${order.client}`} onClick={onEdit}>
           <Pencil className="size-4" />
         </IconButton>
       </div>
 
-      <p className="text-sm whitespace-pre-line">{order.detail}</p>
+      {turn && order.services.length > 0 && <p className="text-sm font-medium">{orderTitle(order)}</p>}
+      {order.detail && !(turn && order.detail === orderTitle(order)) && (
+        <p className="text-sm whitespace-pre-line">{order.detail}</p>
+      )}
 
       {order.materials.length > 0 && (
         <p className="text-xs text-muted-foreground">
@@ -904,7 +1070,7 @@ function OrderCard({
 
       <div className="flex items-center gap-2">
         <select
-          aria-label={`Estado del pedido de ${order.client}`}
+          aria-label={`Estado del ${turn ? "turno" : "pedido"} de ${order.client}`}
           value={order.status}
           disabled={pending}
           onChange={(e) => changeStatus(e.target.value as OrderStatus)}
@@ -912,13 +1078,13 @@ function OrderCard({
         >
           {ORDER_STATUSES.map((s) => (
             <option key={s} value={s}>
-              {STATUS_LABEL[s]}
+              {statusLabel({ kind: order.kind, status: s })}
             </option>
           ))}
         </select>
         {balance > 0 && order.status !== "cancelled" && (
           <Button variant="outline" onClick={onPay}>
-            Registrar pago
+            {turn ? "Cobrar" : "Registrar pago"}
           </Button>
         )}
       </div>

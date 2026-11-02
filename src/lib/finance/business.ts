@@ -7,7 +7,7 @@ import type { Category, Transaction, TxType } from "@/lib/finance/types";
  * Pestañas de Mi negocio (`?t=`). Viven acá y no en `BusinessView` porque la página (servidor)
  * las usa: lo que se exporta de un módulo "use client" llega al servidor como referencia, no como valor.
  */
-export const BUSINESS_TABS = ["resumen", "pedidos", "clientes", "stock", "gastos"] as const;
+export const BUSINESS_TABS = ["resumen", "calendario", "pedidos", "clientes", "stock", "gastos"] as const;
 export type BusinessTab = (typeof BUSINESS_TABS)[number];
 
 export const ORDER_STATUSES = ["taken", "in_progress", "delivered", "cancelled"] as const;
@@ -27,11 +27,39 @@ export const PRIORITY_LABEL: Record<OrderPriority, string> = {
   low: "Baja",
 };
 
+/** Pedido (se entrega un día) o turno (el cliente viene a una hora, ej. un corte). */
+export const ORDER_KINDS = ["order", "appointment"] as const;
+export type OrderKind = (typeof ORDER_KINDS)[number];
+
+/** Estados con el nombre que corresponde a un turno. */
+export const APPOINTMENT_STATUS_LABEL: Record<OrderStatus, string> = {
+  taken: "Agendado",
+  in_progress: "En curso",
+  delivered: "Atendido",
+  cancelled: "Cancelado",
+};
+export const statusLabel = (o: Pick<Order, "kind" | "status">) =>
+  (o.kind === "appointment" ? APPOINTMENT_STATUS_LABEL : STATUS_LABEL)[o.status];
+
+/** Servicio que se cobra sin stock (ej. "Corte"); se carga en la pestaña Stock. */
+export type Service = {
+  id: string;
+  name: string;
+  price: number;
+  /** Duración en minutos (0 = sin indicar) */
+  duration: number;
+};
+
+/** Servicio de un turno; nombre, precio y duración quedan fijos aunque el servicio cambie. */
+export type OrderService = { serviceId: string; name: string; price: number; duration: number };
+
 /** Material usado en un pedido; nombre y precio quedan fijos aunque el material cambie. */
 export type OrderMaterial = { materialId: string; name: string; qty: number; unitPrice: number };
 
 export type Order = {
   id: string;
+  /** Sin dato = pedido */
+  kind: OrderKind;
   /** Cliente de la libreta (`clients`); null en pedidos viejos todavía sin enlazar */
   clientId: string | null;
   /** Copia del nombre del cliente al guardar el pedido */
@@ -40,10 +68,14 @@ export type Order = {
   detail: string;
   amount: number;
   priority: OrderPriority;
-  /** YYYY-MM-DD */
+  /** YYYY-MM-DD: entrega del pedido o día del turno */
   deliveryDate: string;
+  /** Hora del turno ("HH:MM"); null en pedidos */
+  time: string | null;
   status: OrderStatus;
   materials: OrderMaterial[];
+  /** Servicios del turno (vacío en pedidos) */
+  services: OrderService[];
   /** Suma de los pagos; se actualiza en una transacción junto con cada pago */
   paid: number;
   createdAt: number;
@@ -155,12 +187,80 @@ export function sortOrders(orders: Order[]): Order[] {
   );
 }
 
-/** Pedidos abiertos que se entregan en los próximos `days` días (incluye atrasados). */
+/** Pedidos y turnos abiertos de los próximos `days` días (incluye pedidos atrasados, no turnos pasados). */
 export function upcomingDeliveries(orders: Order[], today: string, days = 7): Order[] {
   const limit = shiftDay(today, days);
   return orders
-    .filter((o) => isOpen(o) && o.deliveryDate <= limit)
-    .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate));
+    .filter((o) => isOpen(o) && o.deliveryDate <= limit && (o.kind === "order" || o.deliveryDate >= today))
+    .sort((a, b) => a.deliveryDate.localeCompare(b.deliveryDate) || (a.time ?? "99").localeCompare(b.time ?? "99"));
+}
+
+// ---- Calendario ----
+
+/** "HH:MM" + minutos → "HH:MM" (sin pasar de 23:59). */
+export function addMinutes(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = Math.min(23 * 60 + 59, h * 60 + m + minutes);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+export const servicesDuration = (o: Pick<Order, "services">) => o.services.reduce((s, x) => s + x.duration, 0);
+
+/** "10:00–10:45" si el turno tiene duración; "10:00" si no; null si no tiene hora. */
+export function timeRange(o: Pick<Order, "time" | "services">): string | null {
+  if (!o.time) return null;
+  const minutes = servicesDuration(o);
+  return minutes > 0 ? `${o.time}–${addMinutes(o.time, minutes)}` : o.time;
+}
+
+/** Qué se hace en el turno o pedido, en una línea: servicios o el detalle. */
+export const orderTitle = (o: Pick<Order, "services" | "detail">) =>
+  o.services.length ? o.services.map((s) => s.name).join(" + ") : o.detail.split("\n")[0];
+
+/** Agenda de un día: turnos por hora y después las entregas. Los cancelados van al final. */
+export function dayAgenda(orders: Order[], date: string): Order[] {
+  return orders
+    .filter((o) => o.deliveryDate === date)
+    .sort(
+      (a, b) =>
+        Number(a.status === "cancelled") - Number(b.status === "cancelled") ||
+        (a.time ?? "99").localeCompare(b.time ?? "99") ||
+        a.createdAt - b.createdAt,
+    );
+}
+
+/** Por día del mes (YYYY-MM-DD): cuántos turnos y entregas no cancelados hay. */
+export function monthMarks(orders: Order[], month: string): Map<string, { appointments: number; deliveries: number }> {
+  const out = new Map<string, { appointments: number; deliveries: number }>();
+  for (const o of orders) {
+    if (o.status === "cancelled" || !o.deliveryDate.startsWith(month)) continue;
+    const mark = out.get(o.deliveryDate) ?? { appointments: 0, deliveries: 0 };
+    if (o.kind === "appointment") mark.appointments += 1;
+    else mark.deliveries += 1;
+    out.set(o.deliveryDate, mark);
+  }
+  return out;
+}
+
+/** Aviso del día ("Hoy tienes 2 turnos y 1 entrega"); null si no hay nada abierto hoy. */
+export function todayAgendaPush(orders: Order[], today: string): { title: string; body: string } | null {
+  const agenda = dayAgenda(orders, today).filter(isOpen);
+  if (agenda.length === 0) return null;
+  const turns = agenda.filter((o) => o.kind === "appointment").length;
+  const deliveries = agenda.length - turns;
+  const parts = [
+    turns ? `${turns} ${turns === 1 ? "turno" : "turnos"}` : null,
+    deliveries ? `${deliveries} ${deliveries === 1 ? "entrega" : "entregas"}` : null,
+  ].filter(Boolean);
+  const lines = agenda
+    .slice(0, 4)
+    .map((o) =>
+      o.kind === "appointment"
+        ? `${o.time ?? "Sin hora"} ${o.client}${o.services.length ? ` (${orderTitle(o)})` : ""}`
+        : `Entrega de ${o.client}`,
+    );
+  if (agenda.length > 4) lines.push(`y ${agenda.length - 4} más`);
+  return { title: `Hoy tienes ${parts.join(" y ")}`, body: lines.join(" · ") };
 }
 
 /** Rango de fechas inclusivo; `from` null = desde el principio. */
@@ -170,6 +270,7 @@ const inRange = (date: string, { from, to }: DateRange) => (!from || date >= fro
 export type BusinessData = {
   orders: Order[];
   materials: Material[];
+  services: Service[];
   payments: OrderPayment[];
   purchases: MaterialPurchase[];
   expenses: BusinessExpense[];

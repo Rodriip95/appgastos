@@ -8,10 +8,12 @@ import { DOC_ID_RE, userCollection } from "@/lib/data/collections";
 import {
   EXPENSE_CONCEPTS,
   normalizeName,
+  ORDER_KINDS,
   ORDER_PRIORITIES,
   ORDER_STATUSES,
   orderBalance,
   type OrderMaterial,
+  type OrderService,
 } from "@/lib/finance/business";
 import { formatMoney } from "@/lib/finance/format";
 import type { ActionResult } from "@/lib/finance/types";
@@ -20,18 +22,41 @@ const money = z.number("Ingresa un monto válido").positive("El monto debe ser m
 const quantity = z.number("Ingresa una cantidad válida").positive("La cantidad debe ser mayor a 0").max(1e9);
 const idSchema = z.string().regex(DOC_ID_RE);
 
-const orderSchema = z.object({
+const orderSchema = z
+  .object({
+  kind: z.enum(ORDER_KINDS).default("order"),
   /** Cliente elegido de la libreta; sin él, se busca por nombre o se crea */
   clientId: idSchema.nullish(),
   client: z.string().trim().min(1, "¿Para quién es el pedido?").max(60, "Nombre muy largo"),
   phone: z.string().trim().max(30, "Teléfono muy largo").default(""),
-  detail: z.string().trim().min(1, "Cuenta qué lleva el pedido").max(500, "Detalle muy largo"),
+  detail: z.string().trim().max(500, "Detalle muy largo").default(""),
   amount: money,
   priority: z.enum(ORDER_PRIORITIES),
   deliveryDate: z.iso.date("Fecha inválida"),
+  /** Hora del turno */
+  time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Hora inválida")
+    .nullish(),
   materials: z.array(z.object({ materialId: idSchema, qty: quantity })).max(30),
-});
+  /** Servicios del turno */
+  services: z.array(idSchema).max(10).default([]),
+  })
+  .superRefine((o, ctx) => {
+    if (o.kind === "order" && !o.detail) ctx.addIssue({ code: "custom", message: "Cuenta qué lleva el pedido" });
+    if (o.kind === "appointment" && !o.time) ctx.addIssue({ code: "custom", message: "Elige la hora del turno" });
+    if (o.kind === "appointment" && !o.services.length && !o.detail) {
+      ctx.addIssue({ code: "custom", message: "Elige un servicio o cuenta qué se hace" });
+    }
+  });
 export type OrderInput = z.input<typeof orderSchema>;
+
+const serviceSchema = z.object({
+  name: z.string().trim().min(1, "Ponle un nombre al servicio").max(60, "Nombre muy largo"),
+  price: z.number("Ingresa un precio válido").min(0, "Precio inválido").max(1e12),
+  duration: z.number("Ingresa una duración válida").int().min(0).max(24 * 60).default(0),
+});
+export type ServiceInput = z.input<typeof serviceSchema>;
 
 const paymentSchema = z.object({
   orderId: idSchema,
@@ -108,7 +133,8 @@ export async function saveOrder(input: OrderInput, id?: string): Promise<ActionR
   const parsed = orderSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
   if (id !== undefined && !idSchema.safeParse(id).success) return fail("Pedido inválido");
-  const { materials, clientId: pickedClient, ...rest } = parsed.data;
+  const { materials, services, clientId: pickedClient, ...data } = parsed.data;
+  const rest = { ...data, time: data.kind === "appointment" ? (data.time ?? null) : null };
 
   let client: { clientId: string; client: string; phone: string };
   try {
@@ -123,12 +149,34 @@ export async function saveOrder(input: OrderInput, id?: string): Promise<ActionR
 
   const orders = userCollection(uid, "orders");
   const materialsCol = userCollection(uid, "materials");
+  const servicesCol = userCollection(uid, "services");
   try {
     const error = await orders.firestore.runTransaction(async (tx) => {
       const ref = id ? orders.doc(id) : orders.doc();
       const current = id ? await tx.get(ref) : null;
       if (current && !current.exists) return "El pedido ya no existe";
       const previous: OrderMaterial[] = current?.get("materials") ?? [];
+      const previousServices: OrderService[] = current?.get("services") ?? [];
+
+      // Servicios del turno: los que ya estaban conservan su precio; los nuevos copian el actual.
+      const ids = rest.kind === "appointment" ? [...new Set(services)] : [];
+      const serviceDocs = ids.length ? await tx.getAll(...ids.map((s) => servicesCol.doc(s))) : [];
+      const serviceLines: OrderService[] = [];
+      for (const [i, doc] of serviceDocs.entries()) {
+        const kept = previousServices.find((p) => p.serviceId === ids[i]);
+        if (kept) {
+          serviceLines.push(kept);
+          continue;
+        }
+        if (!doc.exists) return "Uno de los servicios ya no existe";
+        serviceLines.push({
+          serviceId: ids[i],
+          name: doc.get("name") as string,
+          price: Number(doc.get("price")) || 0,
+          duration: Number(doc.get("duration")) || 0,
+        });
+      }
+      const detail = rest.detail || serviceLines.map((s) => s.name).join(" + ");
 
       // Precio y nombre se copian al pedido; los que ya estaban conservan su precio.
       const docs = materials.length
@@ -151,11 +199,19 @@ export async function saveOrder(input: OrderInput, id?: string): Promise<ActionR
         await adjustStock(tx, uid, stockDeltas(lines, -1, stockDeltas(previous, 1)));
       }
       if (current) {
-        tx.update(ref, { ...fields, materials: lines, updatedAt: FieldValue.serverTimestamp() });
+        tx.update(ref, {
+          ...fields,
+          detail,
+          materials: lines,
+          services: serviceLines,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
       } else {
         tx.set(ref, {
           ...fields,
+          detail,
           materials: lines,
+          services: serviceLines,
           status: "taken",
           paid: 0,
           createdAt: FieldValue.serverTimestamp(),
@@ -351,6 +407,43 @@ export async function deleteMaterial(id: string): Promise<ActionResult> {
   } catch (error) {
     console.error("[business] delete material:", error);
     return fail("No pudimos eliminar el material");
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function saveService(input: ServiceInput, id?: string): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  const parsed = serviceSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Datos inválidos");
+  if (id !== undefined && !idSchema.safeParse(id).success) return fail("Servicio inválido");
+
+  const col = userCollection(uid, "services");
+  try {
+    if (id) {
+      const ref = col.doc(id);
+      if (!(await ref.get()).exists) return fail("El servicio ya no existe");
+      await ref.update({ ...parsed.data, updatedAt: FieldValue.serverTimestamp() });
+    } else {
+      await col.add({ ...parsed.data, createdAt: FieldValue.serverTimestamp() });
+    }
+  } catch (error) {
+    console.error("[business] save service:", error);
+    return fail("No pudimos guardar el servicio");
+  }
+  refresh();
+  return { ok: true };
+}
+
+/** Los turnos conservan su copia del nombre y el precio. */
+export async function deleteService(id: string): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  if (!idSchema.safeParse(id).success) return fail("Servicio inválido");
+  try {
+    await userCollection(uid, "services").doc(id).delete();
+  } catch (error) {
+    console.error("[business] delete service:", error);
+    return fail("No pudimos eliminar el servicio");
   }
   refresh();
   return { ok: true };

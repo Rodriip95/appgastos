@@ -72,7 +72,7 @@ export function SharedSpaceView({ space, entries, me, contacts, today, link, exp
         </div>
       </div>
 
-      <BalanceLine members={members} balance={balance} me={me} />
+      <BalanceLine members={members} balance={balance} me={me} currency={space.currency} />
 
       {bySub.length > 0 && (
         <section aria-label="Por subcategoría" className="rounded-3xl border bg-card p-4 sm:p-5">
@@ -84,7 +84,7 @@ export function SharedSpaceView({ space, entries, me, contacts, today, link, exp
                 <li key={row.subcategoryId ?? "none"} className="py-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="min-w-0 truncate text-sm font-medium">{name}</p>
-                    <p className="shrink-0 text-sm font-semibold tabular-nums">{money(row.total)}</p>
+                    <p className="shrink-0 text-sm font-semibold tabular-nums">{money(row.total, space.currency)}</p>
                   </div>
                   <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
                     {members.map((m, i) => (
@@ -99,8 +99,8 @@ export function SharedSpaceView({ space, entries, me, contacts, today, link, exp
                     {members.map((m, i) => (
                       <span key={m.uid} className="inline-flex items-center gap-1.5">
                         <span className={cn("size-2 rounded-full", toneAt(i).dot)} />
-                        {money(row.people[m.uid]?.paid ?? 0)}
-                        <span className="text-foreground/70">({signedMoney(row.people[m.uid]?.net ?? 0)})</span>
+                        {money(row.people[m.uid]?.paid ?? 0, space.currency)}
+                        <span className="text-foreground/70">({signedMoney(row.people[m.uid]?.net ?? 0, space.currency)})</span>
                       </span>
                     ))}
                   </div>
@@ -156,7 +156,7 @@ export function SharedSpaceView({ space, entries, me, contacts, today, link, exp
                         .join(" · ")}
                     </p>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums">{money(e.amountCents)}</span>
+                  <span className="shrink-0 text-sm font-semibold tabular-nums">{money(e.amountCents, space.currency)}</span>
                   {e.createdBy === me ? (
                     <DeleteEntryButton spaceId={space.id} entryId={e.id} />
                   ) : (

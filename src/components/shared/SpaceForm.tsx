@@ -14,7 +14,7 @@ import { COLOR_KEYS, type ColorKey, type IconKey } from "@/lib/finance/catalog";
 import { suggestionCategories, type ExpenseCategory } from "@/lib/finance/defaults";
 import { formatAmountInput, parseAmount, todayKey } from "@/lib/finance/format";
 import { fromCents } from "@/lib/finance/shared";
-import type { Person, SharedSpace } from "@/lib/finance/types";
+import type { Currency, Person, SharedSpace } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 const SPACE_ICONS: IconKey[] = [
@@ -160,6 +160,7 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, catego
     space?.goal ? formatAmountInput(String(fromCents(space.goal.targetCents)).replace(".", ",")) : "",
   );
   const [targetDate, setTargetDate] = useState(space?.goal?.targetDate ?? "");
+  const [currency, setCurrency] = useState<Currency>(space?.currency ?? "ARS");
   const [subs, setSubs] = useState<{ id?: string; name: string }[]>(space?.subcategories ?? []);
   const [invite, setInvite] = useState<Set<string>>(new Set());
   const [categoryName, setCategoryName] = useState<string | null>(null);
@@ -200,6 +201,7 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, catego
         icon,
         color,
         subcategories,
+        currency,
         ...(isGoal && { target: parseAmount(target) ?? 0, targetDate: targetDate || null }),
       };
       const res = space
@@ -233,13 +235,42 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, catego
         </div>
       </div>
 
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">Moneda</legend>
+        <div role="radiogroup" aria-label="Moneda del espacio" className="grid grid-cols-2 rounded-xl bg-muted p-1">
+          {(["ARS", "USD"] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={currency === c}
+              onClick={() => setCurrency(c)}
+              disabled={!!space}
+              className={cn(
+                "h-9 rounded-lg text-sm font-medium transition disabled:opacity-60",
+                currency === c ? "bg-background shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              {c === "ARS" ? "Pesos" : "Dólares"}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {space
+            ? "La moneda se elige al crear el espacio y no se puede cambiar."
+            : isGoal
+              ? "Todos los aportes y el objetivo van en esta moneda. Ideal en dólares para un viaje."
+              : "Todos los gastos del espacio van en esta moneda. Ideal en dólares para un viaje."}
+        </p>
+      </fieldset>
+
       {isGoal && (
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="space-target">¿Cuánto quieren juntar?</Label>
             <div className="relative">
               <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
-                $
+                {currency === "USD" ? "US$" : "$"}
               </span>
               <Input
                 id="space-target"
@@ -248,7 +279,7 @@ export function SpaceForm({ kind: kindProp = "expenses", space, contacts, catego
                 value={target}
                 onChange={(e) => setTarget(formatAmountInput(e.target.value))}
                 placeholder="0"
-                className="h-11 pl-7 text-base tabular-nums"
+                className={cn("h-11 text-base tabular-nums", currency === "USD" ? "pl-11" : "pl-7")}
                 required
               />
             </div>

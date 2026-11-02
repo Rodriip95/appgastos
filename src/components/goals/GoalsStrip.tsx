@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { CATEGORY_COLORS, CategoryIcon } from "@/components/categories/CategoryIcon";
+import { formatTotals } from "@/lib/finance/currency";
 import { formatMoney } from "@/lib/finance/format";
-import { goalPct } from "@/lib/finance/goals";
+import { goalPct, goalTotals } from "@/lib/finance/goals";
 import type { Goal } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -15,14 +16,14 @@ export function GoalsStrip({ goals, href }: { goals: Goal[]; href: string }) {
     .filter((g) => g.saved < g.target)
     .sort((a, b) => goalPct(b) - goalPct(a))
     .slice(0, MAX_GOALS);
-  const total = goals.reduce((sum, g) => sum + g.saved, 0);
+  const total = goalTotals(goals).saved;
 
   return (
     <section aria-label="Metas de ahorro" className="rounded-3xl border bg-card p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold">Metas</h2>
-          <p className="text-xs text-muted-foreground tabular-nums">{formatMoney(total)} reservados en total</p>
+          <p className="text-xs text-muted-foreground tabular-nums">{formatTotals(total)} reservados en total</p>
         </div>
         <Link
           href={href}
@@ -53,7 +54,7 @@ export function GoalsStrip({ goals, href }: { goals: Goal[]; href: string }) {
                       />
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                      {formatMoney(g.saved)} de {formatMoney(g.target)}
+                      {formatMoney(g.saved, g.currency)} de {formatMoney(g.target, g.currency)}
                     </p>
                   </div>
                 </Link>

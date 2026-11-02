@@ -12,6 +12,7 @@ import type { ActionResult } from "@/lib/finance/types";
 const goalSchema = z.object({
   name: z.string().trim().min(1, "Ponle un nombre a la meta").max(40, "Nombre muy largo"),
   target: z.number("Ingresa un monto válido").positive("El objetivo debe ser mayor a 0").max(1e12),
+  currency: z.enum(["ARS", "USD"]).default("ARS"),
   targetDate: z.iso.date("Fecha inválida").nullable(),
   icon: z.enum(ICON_KEYS),
   color: z.enum(COLOR_KEYS),
@@ -43,7 +44,13 @@ export async function saveGoal(input: GoalInput, id?: string): Promise<ActionRes
   try {
     if (id) {
       const ref = col.doc(id);
-      if (!(await ref.get()).exists) return fail("La meta ya no existe");
+      const current = await ref.get();
+      if (!current.exists) return fail("La meta ya no existe");
+      // La moneda solo cambia mientras no haya nada reservado (los aportes quedan en su moneda).
+      const currentCurrency = current.get("currency") === "USD" ? "USD" : "ARS";
+      if (currentCurrency !== parsed.data.currency && (Number(current.get("saved")) || 0) !== 0) {
+        return fail("Para cambiar la moneda, la meta no tiene que tener dinero reservado");
+      }
       // `saved` no se toca aquí: solo cambia con aportes y retiros.
       await ref.update({ ...parsed.data, updatedAt: FieldValue.serverTimestamp() });
     } else {
@@ -91,10 +98,12 @@ export async function addGoalMovement(input: GoalMovementInput): Promise<ActionR
       const goal = await tx.get(goalRef);
       if (!goal.exists) return "La meta ya no existe";
       const saved = Number(goal.get("saved")) || 0;
-      if (saved + signed < -0.001) return `Solo hay ${formatMoney(saved)} reservados en esta meta`;
+      const currency = goal.get("currency") === "USD" ? "USD" : "ARS";
+      if (saved + signed < -0.001) return `Solo hay ${formatMoney(saved, currency)} reservados en esta meta`;
       tx.set(movementRef, {
         goalId,
         amount: signed,
+        currency,
         date,
         month: date.slice(0, 7),
         note,

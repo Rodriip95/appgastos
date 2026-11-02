@@ -21,6 +21,7 @@ export function GoalCard({ goal, today }: { goal: Goal; today: string }) {
   const pct = goalPct(goal);
   const plan = goalPlan(goal, today);
   const done = plan.kind === "done";
+  const money = (n: number) => formatMoney(Math.round(n * 100) / 100, goal.currency);
 
   return (
     <section className="space-y-4 rounded-3xl border bg-card p-4">
@@ -44,9 +45,9 @@ export function GoalCard({ goal, today }: { goal: Goal; today: string }) {
 
       <div className="space-y-2">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-2xl font-semibold tracking-tight tabular-nums">{formatMoney(goal.saved)}</p>
+          <p className="text-2xl font-semibold tracking-tight tabular-nums">{money(goal.saved)}</p>
           <p className="text-sm text-muted-foreground tabular-nums">
-            de {formatMoney(goal.target)} · <span className="font-medium text-foreground">{Math.floor(pct)}%</span>
+            de {money(goal.target)} · <span className="font-medium text-foreground">{Math.floor(pct)}%</span>
           </p>
         </div>
         <div className="h-2.5 overflow-hidden rounded-full bg-muted">
@@ -63,12 +64,12 @@ export function GoalCard({ goal, today }: { goal: Goal; today: string }) {
         >
           {done && <Trophy className="mr-1 inline size-3.5 align-[-2px]" />}
           {plan.kind === "done" && "¡Meta cumplida!"}
-          {plan.kind === "no-date" && `Te faltan ${formatMoney(goal.target - goal.saved)}`}
+          {plan.kind === "no-date" && `Te faltan ${money(goal.target - goal.saved)}`}
           {plan.kind === "overdue" &&
-            `La fecha ya pasó y faltan ${formatMoney(plan.remaining)}. Puedes ajustar la meta.`}
+            `La fecha ya pasó y faltan ${money(plan.remaining)}. Puedes ajustar la meta.`}
           {plan.kind === "monthly" && (
             <>
-              Aparta <strong className="font-semibold text-foreground">{formatMoney(plan.perMonth)}</strong> por mes
+              Aparta <strong className="font-semibold text-foreground">{money(plan.perMonth)}</strong> por mes
               para llegar a tiempo ({plan.months} {plan.months === 1 ? "mes" : "meses"})
             </>
           )}

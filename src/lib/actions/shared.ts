@@ -30,6 +30,8 @@ const spaceSchema = z.object({
 });
 
 export type SpaceInput = z.input<typeof spaceSchema> & {
+  /** Moneda del espacio; se elige al crearlo y no cambia después (los montos ya cargados están en ella) */
+  currency?: "ARS" | "USD";
   /** Subcategorías (conceptos, en un objetivo); las que ya existen conservan su `id` */
   subcategories: { id?: string; name: string }[];
   /** Solo en objetivos: monto a juntar y fecha límite opcional */
@@ -130,6 +132,7 @@ export async function createSharedSpace(
 
     await sharedCollection().add({
       kind,
+      currency: input.currency === "USD" ? "USD" : "ARS",
       ...(goal && { goal: goal.goal }),
       ...parsed.data,
       createdBy: me.uid,
@@ -345,7 +348,7 @@ export async function addSharedExpense(input: SharedExpenseInput): Promise<Actio
       createdBy: me.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
-    notifyMembers(found.space, me.uid, found.space.name, `${whoIs(me)} cargó un gasto de ${formatMoney(fromCents(amountCents))}`);
+    notifyMembers(found.space, me.uid, found.space.name, `${whoIs(me)} cargó un gasto de ${formatMoney(fromCents(amountCents), found.space.currency)}`);
   } catch (error) {
     console.error("[shared] add expense:", error);
     return fail("No pudimos registrar el gasto");
@@ -381,7 +384,7 @@ export async function addSharedSettlement(input: SharedSettlementInput): Promise
       createdBy: me.uid,
       createdAt: FieldValue.serverTimestamp(),
     });
-    notifyMembers(found.space, me.uid, found.space.name, `${whoIs(me)} registró un pago de ${formatMoney(fromCents(amountCents))}`);
+    notifyMembers(found.space, me.uid, found.space.name, `${whoIs(me)} registró un pago de ${formatMoney(fromCents(amountCents), found.space.currency)}`);
   } catch (error) {
     console.error("[shared] add settlement:", error);
     return fail("No pudimos registrar el pago");
@@ -479,7 +482,7 @@ export async function addGoalContribution(input: GoalContributionInput): Promise
       found.space,
       me.uid,
       found.space.name,
-      `${whoIs(me)} ${kind === "deposit" ? "aportó" : "retiró"} ${formatMoney(fromCents(amountCents))}`,
+      `${whoIs(me)} ${kind === "deposit" ? "aportó" : "retiró"} ${formatMoney(fromCents(amountCents), found.space.currency)}`,
     );
   } catch (error) {
     console.error("[shared] contribution:", error);

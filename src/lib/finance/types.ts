@@ -69,8 +69,10 @@ export type CreditCard = {
 export type Goal = {
   id: string;
   name: string;
-  /** Monto objetivo */
+  /** Monto objetivo, en la moneda de la meta */
   target: number;
+  /** Moneda de la meta: aportes, retiros y objetivo van en esta moneda */
+  currency: Currency;
   /** Fecha objetivo (YYYY-MM-DD) o null si no tiene */
   targetDate: string | null;
   icon: IconKey;
@@ -83,8 +85,9 @@ export type Goal = {
 export type GoalMovement = {
   id: string;
   goalId: string;
-  /** Positivo = aporte; negativo = retiro */
+  /** Positivo = aporte; negativo = retiro (en la moneda de la meta) */
   amount: number;
+  currency: Currency;
   /** YYYY-MM-DD */
   date: string;
   /** YYYY-MM, derivado de `date` */
@@ -130,6 +133,8 @@ export type SharedSpace = {
   createdBy: string;
   /** Todos los que alguna vez participaron; el historial conserva a quienes se fueron */
   members: SharedMember[];
+  /** Moneda del espacio: todos sus montos (`amountCents`) y el objetivo van en esta moneda */
+  currency: Currency;
   /** Subcategorías propias del espacio (nafta, service, seguro…); en un objetivo son los conceptos */
   subcategories: Subcategory[];
   /** Solo en objetivos: monto a juntar (centavos) y fecha límite opcional */

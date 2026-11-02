@@ -45,6 +45,7 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
       color: space.color,
       saved: fromCents(progress.saved),
       target: fromCents(target),
+      currency: space.currency,
       targetDate,
     },
     today,
@@ -94,9 +95,9 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
 
       <section aria-label="Avance" className="rounded-3xl border bg-card p-5">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-4xl font-semibold tracking-tight tabular-nums">{money(progress.saved)}</p>
+          <p className="text-4xl font-semibold tracking-tight tabular-nums">{money(progress.saved, space.currency)}</p>
           <p className="text-sm text-muted-foreground tabular-nums">
-            de {money(target)} · <span className="font-medium text-foreground">{Math.floor(pct)}%</span>
+            de {money(target, space.currency)} · <span className="font-medium text-foreground">{Math.floor(pct)}%</span>
           </p>
         </div>
         <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted">
@@ -110,13 +111,13 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
             <p className="text-xs text-muted-foreground">Falta</p>
             <p className="mt-1 flex items-center gap-1.5 text-lg font-semibold tabular-nums">
               {plan.kind === "done" && <Trophy className="size-4" />}
-              {money(remaining)}
+              {money(remaining, space.currency)}
             </p>
           </div>
           <div className="rounded-2xl bg-muted/50 p-3">
             <p className="text-xs text-muted-foreground">Por mes</p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
-              {plan.kind === "monthly" ? formatMoney(plan.perMonth) : "—"}
+              {plan.kind === "monthly" ? formatMoney(plan.perMonth, space.currency) : "—"}
             </p>
           </div>
         </div>
@@ -144,7 +145,7 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
                   {m.uid === me ? "Tú" : firstName(m)}
                 </span>
                 <span className="text-xs text-muted-foreground tabular-nums">{share}%</span>
-                <span className="w-28 text-right text-sm font-semibold tabular-nums">{money(cents)}</span>
+                <span className="w-28 text-right text-sm font-semibold tabular-nums">{money(cents, space.currency)}</span>
               </li>
             );
           })}
@@ -161,7 +162,7 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
                 <li key={row.subcategoryId ?? "none"} className="py-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="min-w-0 truncate text-sm font-medium">{name}</p>
-                    <p className="shrink-0 text-sm font-semibold tabular-nums">{money(row.saved)}</p>
+                    <p className="shrink-0 text-sm font-semibold tabular-nums">{money(row.saved, space.currency)}</p>
                   </div>
                   <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-muted">
                     {contributors.map((m, i) => (
@@ -176,7 +177,7 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
                     {contributors.map((m, i) => (
                       <span key={m.uid} className="inline-flex items-center gap-1.5">
                         <span className={cn("size-2 rounded-full", toneAt(i).dot)} />
-                        {money(row.people[m.uid] ?? 0)}
+                        {money(row.people[m.uid] ?? 0, space.currency)}
                       </span>
                     ))}
                   </div>
@@ -234,7 +235,7 @@ export function GoalSpaceView({ space, entries, me, contacts, today, link, expen
                     )}
                   >
                     {deposit ? "+" : "−"}
-                    {money(e.amountCents)}
+                    {money(e.amountCents, space.currency)}
                   </span>
                   {e.createdBy === me ? (
                     <DeleteEntryButton spaceId={space.id} entryId={e.id} />

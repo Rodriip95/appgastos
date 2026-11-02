@@ -83,11 +83,11 @@ export function SharedListView({ spaces, invites, contacts, categories }: Props)
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{money(total)}</p>
+                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{money(total, space.currency)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Saldo</p>
-                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{signedMoney(mine)}</p>
+                  <p className="mt-0.5 text-lg font-semibold tabular-nums">{signedMoney(mine, space.currency)}</p>
                 </div>
               </div>
             </Link>

@@ -5,7 +5,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { DOC_ID_RE, userCollection } from "@/lib/data/collections";
-import { getUsdRateFor } from "@/lib/data/fx";
+import { getUsdRateFor, getUsdReference } from "@/lib/data/fx";
 import { todayKey } from "@/lib/finance/format";
 import type { ActionResult } from "@/lib/finance/types";
 
@@ -51,7 +51,7 @@ async function parseAndValidate(uid: string, input: TransactionInput): Promise<P
   // En dólares se guarda la cotización del día del movimiento, para el equivalente en pesos.
   let arsRate: number | null = null;
   if (tx.currency === "USD") {
-    arsRate = (await getUsdRateFor(tx.date, todayKey()))?.rate ?? null;
+    arsRate = (await getUsdRateFor(tx.date, todayKey(), await getUsdReference()))?.rate ?? null;
   }
 
   return {

@@ -1,3 +1,4 @@
+import type { CurrencyTotals } from "@/lib/finance/currency";
 import type { Goal, GoalMovement } from "@/lib/finance/types";
 
 // Lógica pura de metas de ahorro, usable en servidor y cliente.
@@ -33,9 +34,27 @@ export function goalPlan(goal: Goal, today: string): GoalPlan {
   return { kind: "monthly", perMonth: Math.ceil(remaining / months), months };
 }
 
-/** Neto apartado (aportes − retiros) en una lista de movimientos. */
-export const netSaved = (movements: GoalMovement[]) =>
-  round2(movements.reduce((sum, m) => sum + m.amount, 0));
+/** Neto apartado (aportes − retiros) en una lista de movimientos, por moneda. */
+export function netSaved(movements: GoalMovement[]): CurrencyTotals {
+  const t = { ars: 0, usd: 0 };
+  for (const m of movements) t[m.currency === "USD" ? "usd" : "ars"] += m.amount;
+  return { ars: round2(t.ars), usd: round2(t.usd) };
+}
+
+/** Suma de lo reservado y de los objetivos de varias metas, por moneda. */
+export function goalTotals(goals: Goal[]): { saved: CurrencyTotals; target: CurrencyTotals } {
+  const saved = { ars: 0, usd: 0 };
+  const target = { ars: 0, usd: 0 };
+  for (const g of goals) {
+    const k = g.currency === "USD" ? "usd" : "ars";
+    saved[k] += g.saved;
+    target[k] += g.target;
+  }
+  return {
+    saved: { ars: round2(saved.ars), usd: round2(saved.usd) },
+    target: { ars: round2(target.ars), usd: round2(target.usd) },
+  };
+}
 
 /** Metas sugeridas para empezar. */
 export const SUGGESTED_GOALS: Pick<Goal, "name" | "icon" | "color">[] = [

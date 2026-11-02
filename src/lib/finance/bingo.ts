@@ -326,8 +326,8 @@ export function bingoMessages(ctx: BingoContext, limit = 4): BingoMessage[] {
       variant: "wallet",
       text: pick(
         [
-          `¡Estás a un pasito de “${almost.name}”! Te faltan solo ${money(goalRemaining(almost))}. ¡Guau, qué orgullo!`,
-          `Casi, casi: “${almost.name}” está al ${Math.floor(goalPct(almost))}%. Con ${money(goalRemaining(almost))} más la cumples.`,
+          `¡Estás a un pasito de “${almost.name}”! Te faltan solo ${formatMoney(goalRemaining(almost), almost.currency)}. ¡Guau, qué orgullo!`,
+          `Casi, casi: “${almost.name}” está al ${Math.floor(goalPct(almost))}%. Con ${formatMoney(goalRemaining(almost), almost.currency)} más la cumples.`,
         ],
         `${today}:goal`,
       ),

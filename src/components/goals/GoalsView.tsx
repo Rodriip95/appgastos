@@ -7,8 +7,9 @@ import {
   SuggestedGoals,
   UndoMovementButton,
 } from "@/components/goals/GoalSheets";
+import { formatTotals, rateLabel, type UsdRate } from "@/lib/finance/currency";
 import { formatDayLabel, formatMoney, formatMonthShort } from "@/lib/finance/format";
-import { netSaved } from "@/lib/finance/goals";
+import { goalTotals, netSaved } from "@/lib/finance/goals";
 import type { Goal, GoalMovement } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -17,12 +18,18 @@ type Props = {
   /** Últimos aportes y retiros de todas las metas */
   movements: GoalMovement[];
   today: string;
+  /** Cotización de hoy, para el avance total cuando hay metas en las dos monedas */
+  usdRate?: UsdRate | null;
 };
 
 /** Página de ahorros y metas. Solo presentación: los datos llegan de `(app)/ahorros/page.tsx`. */
-export function GoalsView({ goals, movements, today }: Props) {
-  const totalSaved = goals.reduce((sum, g) => sum + g.saved, 0);
-  const totalTarget = goals.reduce((sum, g) => sum + g.target, 0);
+export function GoalsView({ goals, movements, today, usdRate }: Props) {
+  const totals = goalTotals(goals);
+  // Con metas en las dos monedas, el avance total se calcula en pesos con la cotización de hoy.
+  const mixed = (totals.target.ars > 0 || totals.saved.ars > 0) && totals.target.usd > 0;
+  const rate = mixed ? (usdRate?.rate ?? 0) : 1;
+  const totalSaved = totals.saved.ars + totals.saved.usd * rate;
+  const totalTarget = totals.target.ars + totals.target.usd * rate;
   const currentMonth = today.slice(0, 7);
   const thisMonth = netSaved(movements.filter((m) => m.month === currentMonth));
   const byId = new Map(goals.map((g) => [g.id, g]));
@@ -61,7 +68,14 @@ export function GoalsView({ goals, movements, today }: Props) {
             className="rounded-3xl bg-primary p-5 text-primary-foreground shadow-lg shadow-primary/10"
           >
             <p className="text-sm text-primary-foreground/60">Total reservado</p>
-            <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums">{formatMoney(totalSaved)}</p>
+            <p
+              className={cn(
+                "mt-1 font-semibold tracking-tight tabular-nums",
+                totals.saved.usd > 0 && totals.saved.ars > 0 ? "text-3xl" : "text-4xl",
+              )}
+            >
+              {formatTotals(totals.saved)}
+            </p>
             <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-primary-foreground/15">
               <div
                 className="h-full rounded-full bg-emerald-400"
@@ -70,14 +84,20 @@ export function GoalsView({ goals, movements, today }: Props) {
             </div>
             <p className="mt-1.5 text-xs text-primary-foreground/60">
               {Math.round(totalTarget ? (totalSaved / totalTarget) * 100 : 0)}% del total de tus metas (
-              {formatMoney(totalTarget)})
+              {formatTotals(totals.target)})
+              {mixed && usdRate && ` · dólares al ${rateLabel(usdRate.kind)} de hoy`}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-primary-foreground/10 p-3">
                 <p className="text-xs text-primary-foreground/70">En {formatMonthShort(currentMonth).toLowerCase()}</p>
                 <p className="mt-1 truncate text-lg font-semibold tabular-nums">
-                  {thisMonth >= 0 ? "+" : "−"}
-                  {formatMoney(Math.abs(thisMonth))}
+                  {[
+                    (thisMonth.ars !== 0 || thisMonth.usd === 0) &&
+                      `${thisMonth.ars >= 0 ? "+" : "−"}${formatMoney(Math.abs(thisMonth.ars))}`,
+                    thisMonth.usd !== 0 && `${thisMonth.usd >= 0 ? "+" : "−"}${formatMoney(Math.abs(thisMonth.usd), "USD")}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
               </div>
               <div className="rounded-2xl bg-primary-foreground/10 p-3">
@@ -135,7 +155,7 @@ export function GoalsView({ goals, movements, today }: Props) {
                         )}
                       >
                         {deposit ? "+" : "−"}
-                        {formatMoney(Math.abs(m.amount))}
+                        {formatMoney(Math.abs(m.amount), m.currency)}
                       </span>
                       <UndoMovementButton id={m.id} />
                     </li>

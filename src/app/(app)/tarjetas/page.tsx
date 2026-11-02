@@ -7,6 +7,7 @@ import { CATEGORY_COLORS } from "@/components/categories/CategoryIcon";
 import { EditCardButton, NewCardButton } from "@/components/cards/CardSheets";
 import { ImportStatementButton } from "@/components/cards/StatementImport";
 import { getCategories } from "@/lib/data/categories";
+import { getStatementQuota } from "@/lib/data/statement-quota";
 import { getCards } from "@/lib/data/cards";
 import { getUpcomingCardTransactions } from "@/lib/data/transactions";
 import {
@@ -16,7 +17,7 @@ import {
   statementTotal,
 } from "@/lib/finance/cards";
 import { formatMoney, formatMonthShort, formatShortDate, shiftMonth, todayKey } from "@/lib/finance/format";
-import type { CreditCard, Transaction } from "@/lib/finance/types";
+import type { Category, CreditCard, Transaction } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Tarjetas · Bingo" };
@@ -49,21 +50,22 @@ export default function CardsPage() {
 async function CardsContent() {
   await io(); // "hoy" se calcula en cada request
   const today = todayKey();
-  const [cards, upcoming, categories] = await Promise.all([
+  const [cards, upcoming, categories, quota] = await Promise.all([
     getCards(),
     getUpcomingCardTransactions(today.slice(0, 7)),
     getCategories(),
+    getStatementQuota(),
   ]);
 
-  if (cards.length === 0) return <EmptyCards />;
+  if (cards.length === 0) return <EmptyCards categories={categories} quota={quota} />;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-dashed p-4">
         <p className="text-sm text-muted-foreground">
-          ¿Te llegó el resumen? Súbelo y Bingo carga los consumos y las cuotas por ti.
+          ¿Te llegó el resumen? Súbelo y Bingo carga los consumos y las cuotas por ti, o crea la tarjeta si todavía no la tienes.
         </p>
-        <ImportStatementButton cards={cards} categories={categories} />
+        <ImportStatementButton cards={cards} categories={categories} quota={quota} />
       </div>
       <ul className="grid gap-4 md:grid-cols-2">
         {cards.map((card) => (
@@ -176,7 +178,13 @@ function CardSummary({
   );
 }
 
-function EmptyCards() {
+function EmptyCards({
+  categories,
+  quota,
+}: {
+  categories: Category[];
+  quota: { remaining: number; limit: number };
+}) {
   return (
     <div className="flex flex-col items-center rounded-3xl border border-dashed px-6 py-10 text-center">
       <span className="grid size-14 place-items-center rounded-2xl bg-muted">
@@ -187,7 +195,10 @@ function EmptyCards() {
         Con el día de cierre y de vencimiento repartimos tus compras en cuotas por mes y te avisamos
         cuando se acerca el vencimiento.
       </p>
-      <NewCardButton className="mt-6 h-11" />
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <NewCardButton className="h-11" />
+        <ImportStatementButton cards={[]} categories={categories} quota={quota} className="h-11" />
+      </div>
     </div>
   );
 }

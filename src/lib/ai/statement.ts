@@ -13,6 +13,9 @@ const statementSchema = z.object({
   dueDate: z.string().nullable().describe("Fecha de vencimiento del resumen, YYYY-MM-DD"),
   closingDate: z.string().nullable().describe("Fecha de cierre del resumen, YYYY-MM-DD"),
   cardName: z.string().nullable().describe("Banco y marca de la tarjeta, ej. 'Visa Galicia'"),
+  cardLast4: z.string().nullable().describe("Últimos 4 dígitos de la tarjeta, si aparecen"),
+  holderName: z.string().nullable().describe("Nombre del titular tal como figura"),
+  holderId: z.string().nullable().describe("CUIL, CUIT o DNI del titular, solo dígitos, si aparece"),
   items: z.array(
     z.object({
       date: z.string().nullable().describe("Fecha de la compra original, YYYY-MM-DD"),
@@ -40,6 +43,7 @@ Reglas:
 - Si un consumo está en dólares, currency es "USD" y amount es el monto en dólares.
 - Fechas en formato YYYY-MM-DD. Si la fecha de compra no trae año, deducilo de la fecha de cierre.
 - description: el nombre del comercio o concepto, sin códigos ni números de cupón, con mayúscula inicial.
+- cardLast4, holderName y holderId: copialos solo si figuran en el resumen; si no, null. Nunca los inventes.
 - Para categoryId y subcategoryId usá solo ids de la lista de categorías que te paso. Si ninguna encaja con seguridad, null.`;
 
 function categoriesText(categories: Category[]): string {

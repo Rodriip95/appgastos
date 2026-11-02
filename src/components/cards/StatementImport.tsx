@@ -37,15 +37,32 @@ const toRow = (it: StatementItem): Row => ({
   selected: it.currency === "ARS" && !it.duplicate,
 });
 
+/** Opción del selector para crear la tarjeta con los datos del resumen. */
+const NEW_CARD = "new";
+
+const toDay = (v: string) => (v === "" ? Number.NaN : Number(v));
+
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
 
-export function ImportStatementButton({ cards, categories }: { cards: CreditCard[]; categories: Category[] }) {
+type Quota = { remaining: number; limit: number };
+
+export function ImportStatementButton({
+  cards,
+  categories,
+  quota,
+  className,
+}: {
+  cards: CreditCard[];
+  categories: Category[];
+  quota: Quota;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button variant="outline" className="h-10" onClick={() => setOpen(true)}>
+      <Button variant="outline" className={cn("h-10", className)} onClick={() => setOpen(true)}>
         <FileUp /> Importar resumen
       </Button>
       <ResponsiveSheet
@@ -54,7 +71,9 @@ export function ImportStatementButton({ cards, categories }: { cards: CreditCard
         title="Importar resumen"
         description="Sube el PDF o una foto del resumen. Bingo lo lee y antes de guardar revisas cada consumo."
       >
-        {open && <StatementImport cards={cards} categories={categories} onDone={() => setOpen(false)} />}
+        {open && (
+          <StatementImport cards={cards} categories={categories} quota={quota} onDone={() => setOpen(false)} />
+        )}
       </ResponsiveSheet>
     </>
   );
@@ -63,13 +82,17 @@ export function ImportStatementButton({ cards, categories }: { cards: CreditCard
 function StatementImport({
   cards,
   categories,
+  quota,
   onDone,
 }: {
   cards: CreditCard[];
   categories: Category[];
+  quota: Quota;
   onDone: () => void;
 }) {
-  const [cardId, setCardId] = useState(cards[0]?.id ?? "");
+  const [cardId, setCardId] = useState(cards[0]?.id ?? NEW_CARD);
+  const [remaining, setRemaining] = useState(quota.remaining);
+  const [newCard, setNewCard] = useState({ name: "", closingDay: "", dueDay: "" });
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<StatementPreview | null>(null);
   const [month, setMonth] = useState("");
@@ -93,7 +116,12 @@ function StatementImport({
         return;
       }
       setPreview(res.preview);
+      setRemaining(res.preview.remaining);
       setMonth(res.preview.month);
+      if (res.preview.newCard) {
+        const c = res.preview.newCard;
+        setNewCard({ name: c.name, closingDay: c.closingDay ? String(c.closingDay) : "", dueDay: c.dueDay ? String(c.dueDay) : "" });
+      }
       setRows(res.preview.items.map(toRow));
     });
   }
@@ -120,12 +148,20 @@ function StatementImport({
       });
     }
     startTransition(async () => {
-      const res = await importStatement({ cardId, month, items });
+      const isNew = cardId === NEW_CARD;
+      const res = await importStatement({
+        cardId: isNew ? null : cardId,
+        newCard: isNew
+          ? { name: newCard.name, closingDay: toDay(newCard.closingDay), dueDay: toDay(newCard.dueDay), color: "indigo" }
+          : null,
+        month,
+        items,
+      });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      toast.success(`Cargamos ${res.count} ${res.count === 1 ? "consumo" : "consumos"} en ${card?.name ?? "la tarjeta"}`);
+      toast.success(`Cargamos ${res.count} ${res.count === 1 ? "consumo" : "consumos"} en ${card?.name ?? (newCard.name || "la tarjeta")}`);
       onDone();
     });
   }
@@ -146,7 +182,13 @@ function StatementImport({
                 {c.name}
               </option>
             ))}
+            <option value={NEW_CARD}>Nueva tarjeta (con los datos del resumen)</option>
           </select>
+          {cardId === NEW_CARD && (
+            <p className="text-xs text-muted-foreground">
+              Tomamos el nombre, el día de cierre y el de vencimiento del resumen. Los revisas antes de guardar.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -159,6 +201,18 @@ function StatementImport({
             className="h-11 text-base"
           />
         </div>
+
+        <p
+          className={cn(
+            "rounded-2xl p-3 text-xs",
+            remaining > 0 ? "bg-muted text-muted-foreground" : "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300",
+          )}
+        >
+          {remaining > 0
+            ? `Te ${remaining === 1 ? "queda 1 resumen" : `quedan ${remaining} resúmenes`} de ${quota.limit} este mes. Volver a subir el mismo archivo no cuenta.`
+            : `Ya usaste los ${quota.limit} resúmenes de este mes. Se renuevan el 1° del mes que viene.`}{" "}
+          Para evitar abusos guardamos una huella cifrada del titular del resumen, nunca sus datos.
+        </p>
 
         <Button type="submit" className="h-11" disabled={pending || !file || !cardId}>
           {pending ? <Loader2 className="animate-spin" /> : <Sparkles />}
@@ -173,6 +227,44 @@ function StatementImport({
 
   return (
     <div className="flex flex-col gap-4">
+      {cardId === NEW_CARD && (
+        <div className="space-y-3 rounded-2xl border p-3">
+          <p className="text-sm font-medium">Nueva tarjeta</p>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-card-name">Nombre</Label>
+            <Input
+              id="new-card-name"
+              value={newCard.name}
+              onChange={(e) => setNewCard((c) => ({ ...c, name: e.target.value }))}
+              maxLength={30}
+              className="h-10"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-card-closing">Día de cierre</Label>
+              <Input
+                id="new-card-closing"
+                inputMode="numeric"
+                value={newCard.closingDay}
+                onChange={(e) => setNewCard((c) => ({ ...c, closingDay: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="new-card-due">Día de vencimiento</Label>
+              <Input
+                id="new-card-due"
+                inputMode="numeric"
+                value={newCard.dueDay}
+                onChange={(e) => setNewCard((c) => ({ ...c, dueDay: e.target.value.replace(/\D/g, "").slice(0, 2) }))}
+                className="h-10"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="import-month">Resumen que vence en</Label>
         <Input

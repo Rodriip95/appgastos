@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { io } from "next/cache";
-import { BusinessView, type BusinessTab, BUSINESS_TABS } from "@/components/business/BusinessView";
+import { BusinessView } from "@/components/business/BusinessView";
 import { GoalsSkeleton } from "@/components/goals/GoalsSkeleton";
 import { getBusinessData } from "@/lib/data/business";
 import { resolveBalanceView } from "@/lib/finance/balance-view";
-import type { DateRange } from "@/lib/finance/business";
+import { BUSINESS_TABS, type BusinessTab, type DateRange } from "@/lib/finance/business";
 import { isMonthKey, todayKey } from "@/lib/finance/format";
 
 export const metadata: Metadata = { title: "Mi negocio · Bingo" };

@@ -3,6 +3,13 @@ import type { Category, Transaction, TxType } from "@/lib/finance/types";
 
 // Módulo Mi negocio (antes "Emprendimiento"). Lógica pura, usable en servidor y cliente.
 
+/**
+ * Pestañas de Mi negocio (`?t=`). Viven acá y no en `BusinessView` porque la página (servidor)
+ * las usa: lo que se exporta de un módulo "use client" llega al servidor como referencia, no como valor.
+ */
+export const BUSINESS_TABS = ["resumen", "pedidos", "clientes", "stock", "gastos"] as const;
+export type BusinessTab = (typeof BUSINESS_TABS)[number];
+
 export const ORDER_STATUSES = ["taken", "in_progress", "delivered", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export const STATUS_LABEL: Record<OrderStatus, string> = {

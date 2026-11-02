@@ -183,7 +183,7 @@ function EmptyCards({
   quota,
 }: {
   categories: Category[];
-  quota: { remaining: number; limit: number };
+  quota: { remaining: number; limit: number; unlimited: boolean };
 }) {
   return (
     <div className="flex flex-col items-center rounded-3xl border border-dashed px-6 py-10 text-center">

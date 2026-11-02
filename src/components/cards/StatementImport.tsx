@@ -45,7 +45,7 @@ const toDay = (v: string) => (v === "" ? Number.NaN : Number(v));
 const selectClass =
   "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
 
-type Quota = { remaining: number; limit: number };
+type Quota = { remaining: number; limit: number; unlimited: boolean };
 
 export function ImportStatementButton({
   cards,
@@ -205,16 +205,22 @@ function StatementImport({
         <p
           className={cn(
             "rounded-2xl p-3 text-xs",
-            remaining > 0 ? "bg-muted text-muted-foreground" : "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300",
+            quota.unlimited || remaining > 0 ? "bg-muted text-muted-foreground" : "bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300",
           )}
         >
-          {remaining > 0
+          {quota.unlimited
+            ? "Cuenta de administración: sin límite de resúmenes."
+            : remaining > 0
             ? `Te ${remaining === 1 ? "queda 1 resumen" : `quedan ${remaining} resúmenes`} de ${quota.limit} este mes. Volver a subir el mismo archivo no cuenta.`
             : `Ya usaste los ${quota.limit} resúmenes de este mes. Se renuevan el 1° del mes que viene.`}{" "}
           Para evitar abusos guardamos una huella cifrada del titular del resumen, nunca sus datos.
         </p>
 
-        <Button type="submit" className="h-11" disabled={pending || !file || !cardId}>
+        <Button
+          type="submit"
+          className="h-11"
+          disabled={pending || !file || !cardId || (!quota.unlimited && remaining === 0)}
+        >
           {pending ? <Loader2 className="animate-spin" /> : <Sparkles />}
           {pending ? "Leyendo el resumen…" : "Analizar resumen"}
         </Button>

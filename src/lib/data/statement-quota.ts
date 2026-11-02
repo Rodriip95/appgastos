@@ -5,6 +5,7 @@ import { verifySession } from "@/lib/auth/session";
 import { statementQuotaCollection, userCollection } from "@/lib/data/collections";
 import type { ExtractedStatement } from "@/lib/ai/statement";
 import { todayKey } from "@/lib/finance/format";
+import { getFlags } from "@/lib/flags";
 
 // Cupo de resúmenes leídos con IA. Cuenta dos cosas por mes calendario:
 // - por cuenta: users/{uid}/statementImports (un doc por archivo analizado);
@@ -12,6 +13,7 @@ import { todayKey } from "@/lib/finance/format";
 //   abrir varias cuentas no multiplique el cupo. La huella es un HMAC del CUIL/DNI del
 //   titular (o nombre + últimos 4 dígitos) leído del propio resumen: nunca se guarda el dato.
 // Volver a subir el mismo archivo reutiliza el resultado guardado: no cuenta ni llama a la IA.
+// El flag `unlimited_statement_imports` de Remote Config (solo para el admin) saltea el cupo.
 
 export const STATEMENTS_PER_MONTH = 2;
 
@@ -59,18 +61,22 @@ async function usedThisMonth(uid: string, month: string): Promise<number> {
 }
 
 /** Resúmenes que le quedan al usuario este mes. */
-export async function getStatementQuota(): Promise<{ remaining: number; limit: number }> {
+export async function getStatementQuota(): Promise<{ remaining: number; limit: number; unlimited: boolean }> {
   const { uid } = await verifySession();
-  const used = await usedThisMonth(uid, quotaMonth());
-  return { remaining: Math.max(STATEMENTS_PER_MONTH - used, 0), limit: STATEMENTS_PER_MONTH };
+  const [used, flags] = await Promise.all([usedThisMonth(uid, quotaMonth()), getFlags()]);
+  return {
+    remaining: Math.max(STATEMENTS_PER_MONTH - used, 0),
+    limit: STATEMENTS_PER_MONTH,
+    unlimited: flags.unlimitedStatements,
+  };
 }
 
-export async function checkAccountQuota(uid: string): Promise<number> {
+export async function checkAccountQuota(uid: string): Promise<void> {
+  if ((await getFlags()).unlimitedStatements) return;
   const used = await usedThisMonth(uid, quotaMonth());
   if (used >= STATEMENTS_PER_MONTH) {
     throw new QuotaError(`Ya usaste los ${STATEMENTS_PER_MONTH} resúmenes de este mes. Se renuevan el 1° del mes que viene`);
   }
-  return STATEMENTS_PER_MONTH - used;
 }
 
 /** Resultado guardado si este usuario ya analizó el mismo archivo. */
@@ -89,6 +95,7 @@ export async function consumeQuota(uid: string, hash: string, extracted: Extract
   const fingerprint = holderFingerprint(extracted);
   const imports = userCollection(uid, "statementImports");
   const holderRef = statementQuotaCollection().doc(`${fingerprint}_${month}`);
+  const unlimited = (await getFlags()).unlimitedStatements;
   const content: CachedStatement = {
     dueDate: extracted.dueDate,
     closingDate: extracted.closingDate,
@@ -101,19 +108,22 @@ export async function consumeQuota(uid: string, hash: string, extracted: Extract
       tx.get(imports.where("quotaMonth", "==", month)),
       tx.get(holderRef),
     ]);
-    if (mine.size >= STATEMENTS_PER_MONTH) {
-      throw new QuotaError(`Ya usaste los ${STATEMENTS_PER_MONTH} resúmenes de este mes`);
-    }
-    if ((holder.get("count") ?? 0) >= STATEMENTS_PER_MONTH) {
-      throw new QuotaError(
-        `El titular de este resumen ya cargó ${STATEMENTS_PER_MONTH} resúmenes este mes, desde esta u otra cuenta`,
+    // Con el flag de admin no hay cupo: se guarda el resultado (para reutilizarlo) sin contar al titular.
+    if (!unlimited) {
+      if (mine.size >= STATEMENTS_PER_MONTH) {
+        throw new QuotaError(`Ya usaste los ${STATEMENTS_PER_MONTH} resúmenes de este mes`);
+      }
+      if ((holder.get("count") ?? 0) >= STATEMENTS_PER_MONTH) {
+        throw new QuotaError(
+          `El titular de este resumen ya cargó ${STATEMENTS_PER_MONTH} resúmenes este mes, desde esta u otra cuenta`,
+        );
+      }
+      tx.set(
+        holderRef,
+        { month, count: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
       );
     }
-    tx.set(
-      holderRef,
-      { month, count: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() },
-      { merge: true },
-    );
     tx.set(imports.doc(hash), {
       quotaMonth: month,
       fingerprint,

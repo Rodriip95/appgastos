@@ -10,12 +10,14 @@ import { getAdminRemoteConfig } from "@/lib/firebase/admin";
 export type Flags = {
   /** Módulo "Eliminar información": borra todos los datos de la cuenta */
   dataReset: boolean;
+  /** Importar resúmenes sin el cupo mensual (solo para la cuenta de administración) */
+  unlimitedStatements: boolean;
 };
 
 /** Parámetros de Remote Config (Firebase Console > Remote Config > Servidor). */
-const KEYS = { dataReset: "enable_data_reset" } as const;
+const KEYS = { dataReset: "enable_data_reset", unlimitedStatements: "unlimited_statement_imports" } as const;
 
-const DEFAULTS: Flags = { dataReset: false };
+const DEFAULTS: Flags = { dataReset: false, unlimitedStatements: false };
 
 /** La plantilla se vuelve a pedir como mucho una vez por minuto por instancia. */
 const TTL_MS = 60_000;
@@ -28,7 +30,7 @@ async function loadTemplate(): Promise<ServerTemplate | null> {
     const next =
       template ??
       (await getAdminRemoteConfig().getServerTemplate({
-        defaultConfig: { [KEYS.dataReset]: false },
+        defaultConfig: { [KEYS.dataReset]: false, [KEYS.unlimitedStatements]: false },
       }));
     await next.load();
     template = next;
@@ -60,7 +62,10 @@ export async function getFlagsFor(user: { uid: string; email: string | null }): 
   if (!tpl) return DEFAULTS;
   try {
     const config = tpl.evaluate({ randomizationId: user.uid, uid: user.uid, email: user.email ?? "" });
-    return { dataReset: config.getBoolean(KEYS.dataReset) };
+    return {
+      dataReset: config.getBoolean(KEYS.dataReset),
+      unlimitedStatements: config.getBoolean(KEYS.unlimitedStatements),
+    };
   } catch (error) {
     console.error("[flags] evaluate:", error);
     return DEFAULTS;

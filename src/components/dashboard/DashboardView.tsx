@@ -3,6 +3,7 @@ import { CardsStrip } from "@/components/cards/CardsStrip";
 import { BalanceCard } from "@/components/dashboard/BalanceCard";
 import { Breakdown } from "@/components/dashboard/Breakdown";
 import { BudgetsCard } from "@/components/dashboard/BudgetsCard";
+import { BalanceViewSwitcher, PeriodPicker } from "@/components/dashboard/BalanceViewSwitcher";
 import { MonthSwitcher } from "@/components/dashboard/MonthSwitcher";
 import { GoalsStrip } from "@/components/goals/GoalsStrip";
 import { TransactionList } from "@/components/transactions/TransactionList";
@@ -14,7 +15,8 @@ import {
 import { bingoMessages } from "@/lib/finance/bingo";
 import { upcomingDues } from "@/lib/finance/cards";
 import { netSaved } from "@/lib/finance/goals";
-import { shiftMonth } from "@/lib/finance/format";
+import { balanceViewQuery, type BalanceView } from "@/lib/finance/balance-view";
+import { formatMonth, formatMonthShort, formatShortDate, shiftMonth } from "@/lib/finance/format";
 import {
   categoryUsage,
   pendingRecurring,
@@ -46,6 +48,9 @@ type Props = DashboardData & {
   today: string;
   /** Categoría por la que se filtra la lista (?c=) */
   filterKey: string | null;
+  view: BalanceView;
+  /** Lo que muestra la vista general o de período; null en la vista mensual */
+  range: { transactions: Transaction[]; goalMovements: GoalMovement[] } | null;
 };
 
 /** Vista del mes. Solo presentación: los datos llegan de `(app)/page.tsx`. */
@@ -63,6 +68,8 @@ export function DashboardView({
   currentMonth,
   today,
   filterKey,
+  view,
+  range,
 }: Props) {
   const summary = summarizeMonth(transactions, categories, prevTransactions);
   const prevSummary = summarizeMonth(prevTransactions, categories);
@@ -87,9 +94,20 @@ export function DashboardView({
       })
     : [];
 
-  const monthQuery = month === currentMonth ? "" : `m=${month}`;
+  // En general y período se reemplaza solo lo que se ve; el asistente sigue mirando el mes.
+  const shown = range?.transactions ?? transactions;
+  const shownSummary = range ? summarizeMonth(range.transactions, categories) : summary;
+  const scopeLabel =
+    view.kind === "general"
+      ? "tu historial"
+      : view.kind === "period"
+        ? "este período"
+        : formatMonthShort(month);
+
+  const viewQuery =
+    view.kind === "month" && month !== currentMonth ? `m=${month}` : balanceViewQuery(view);
   const hrefWith = (params: string) => {
-    const query = [monthQuery, params].filter(Boolean).join("&");
+    const query = [viewQuery, params].filter(Boolean).join("&");
     return `/${query ? `?${query}` : ""}`;
   };
 
@@ -104,39 +122,62 @@ export function DashboardView({
       <main className="space-y-5">
         {assistant.length > 0 && <BingoAssistant messages={assistant} />}
 
-        <MonthSwitcher
-          month={month}
-          currentMonth={currentMonth}
-          firstMonth={firstMonth}
-          futureMonths={futureMonths}
-        />
+        <BalanceViewSwitcher view={view} today={today} />
+
+        {view.kind === "month" && (
+          <MonthSwitcher
+            month={month}
+            currentMonth={currentMonth}
+            firstMonth={firstMonth}
+            futureMonths={futureMonths}
+          />
+        )}
+        {view.kind === "general" && (
+          <div className="text-center">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+              Balance general
+            </p>
+            <h1 className="text-xl font-semibold tracking-tight">
+              {firstMonth ? `Desde ${formatMonth(firstMonth)}` : "Desde hoy"}
+            </h1>
+          </div>
+        )}
+        {view.kind === "period" && (
+          <div className="space-y-3">
+            <h1 className="text-center text-xl font-semibold tracking-tight">
+              {formatShortDate(view.from)} al {formatShortDate(view.to)}
+            </h1>
+            <PeriodPicker from={view.from} to={view.to} today={today} />
+          </div>
+        )}
 
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:items-start">
           <div className="space-y-5">
             <BalanceCard
-              summary={summary}
+              label={view.kind === "general" ? "Balance general" : view.kind === "period" ? "Balance del período" : undefined}
+              summary={shownSummary}
               previous={
-                prevTransactions.length > 0
+                !range && prevTransactions.length > 0
                   ? { income: prevSummary.income, expense: prevSummary.expense, month: shiftMonth(month, -1) }
                   : undefined
               }
-              projection={projection}
-              saved={netSaved(goalMovements)}
+              projection={range ? null : projection}
+              saved={netSaved(range?.goalMovements ?? goalMovements)}
               incomeAction={<QuickAddButton type="income" />}
               expenseAction={<QuickAddButton type="expense" />}
             />
             <RecurringSuggestions pending={pending} categories={categories} />
             {isCurrent && <CardsStrip cards={cards} upcoming={upcomingCardTransactions} today={today} />}
             {isCurrent && <GoalsStrip goals={goals} href="/ahorros" />}
-            <BudgetsCard categories={categories} summary={summary} />
-            {transactions.length > 0 && (
-              <Breakdown summary={summary} filterHref={(key) => `${hrefWith(`c=${key}`)}#movimientos`} />
+            {!range && <BudgetsCard categories={categories} summary={summary} />}
+            {shown.length > 0 && (
+              <Breakdown summary={shownSummary} filterHref={(key) => `${hrefWith(`c=${key}`)}#movimientos`} />
             )}
           </div>
           <TransactionList
-            transactions={transactions}
+            transactions={shown}
             categories={categories}
-            month={month}
+            scopeLabel={scopeLabel}
             today={today}
             filterKey={filterKey}
             clearFilterHref={`${hrefWith("")}#movimientos`}

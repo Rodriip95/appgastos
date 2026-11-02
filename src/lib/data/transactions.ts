@@ -34,6 +34,17 @@ export async function getMonthTransactions(month: string): Promise<Transaction[]
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 }
 
+/** Movimientos entre dos fechas (`from` null = desde el principio), del más reciente al más antiguo. */
+export async function getRangeTransactions(from: string | null, to: string): Promise<Transaction[]> {
+  const { uid } = await verifySession();
+  // Rango sobre un solo campo: no requiere índice compuesto.
+  const upTo = userCollection(uid, "transactions").where("date", "<=", to);
+  const snap = await (from ? upTo.where("date", ">=", from) : upTo).get();
+  return snap.docs
+    .map(toTransaction)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+}
+
 /** Primer mes con movimientos (límite para navegar hacia atrás). */
 export async function getFirstActivityMonth(): Promise<string | null> {
   const { uid } = await verifySession();

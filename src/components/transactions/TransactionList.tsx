@@ -5,13 +5,14 @@ import Link from "next/link";
 import { Inbox, Search, SearchX, X } from "lucide-react";
 import { ShowMoreButton } from "@/components/common/CollapsibleList";
 import { TransactionRow } from "@/components/transactions/TransactionSheet";
-import { formatDayLabel, formatMoney, formatMonthShort } from "@/lib/finance/format";
+import { formatDayLabel, formatMoney } from "@/lib/finance/format";
 import type { Category, Transaction } from "@/lib/finance/types";
 
 type Props = {
   transactions: Transaction[];
   categories: Category[];
-  month: string;
+  /** Qué se está viendo, para el estado vacío: "Octubre", "este período"… */
+  scopeLabel: string;
   today: string;
   /** Categoría por la que se filtra ("none" = sin categoría); viene de la URL */
   filterKey?: string | null;
@@ -30,7 +31,7 @@ const normalize = (s: string) =>
 export function TransactionList({
   transactions,
   categories,
-  month,
+  scopeLabel,
   today,
   filterKey,
   clearFilterHref,
@@ -45,7 +46,7 @@ export function TransactionList({
         <span className="grid size-12 place-items-center rounded-2xl bg-muted">
           <Inbox className="size-6 text-muted-foreground" />
         </span>
-        <h2 className="mt-3 font-semibold">Sin movimientos en {formatMonthShort(month)}</h2>
+        <h2 className="mt-3 font-semibold">Sin movimientos en {scopeLabel}</h2>
         <p className="mt-1 max-w-xs text-sm text-muted-foreground">
           Registra el primero con los botones <strong className="font-medium text-foreground">+</strong>{" "}
           y <strong className="font-medium text-foreground">−</strong> de la tarjeta de balance.

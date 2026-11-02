@@ -13,7 +13,7 @@ type Props = {
 };
 
 const hrefFor = (month: string, currentMonth: string) =>
-  month === currentMonth ? "/" : `/?m=${month}`;
+  month === currentMonth ? "/?v=mes" : `/?m=${month}`;
 
 export function MonthSwitcher({ month, currentMonth, firstMonth, futureMonths }: Props) {
   // Hacia adelante del mes actual solo se pasa por meses con movimientos.
@@ -38,14 +38,14 @@ export function MonthSwitcher({ month, currentMonth, firstMonth, futureMonths }:
           </p>
           <h1 className="text-xl font-semibold tracking-tight">{formatMonth(month)}</h1>
         </div>
-        <ArrowLink href={next ? hrefFor(next, currentMonth) : "/"} enabled={!!next} label="Mes siguiente">
+        <ArrowLink href={next ? hrefFor(next, currentMonth) : "/?v=mes"} enabled={!!next} label="Mes siguiente">
           <ChevronRight />
         </ArrowLink>
       </nav>
       {!isCurrent && (
         <div className="flex justify-center">
           <Link
-            href="/"
+            href="/?v=mes"
             className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
           >
             <RotateCcw className="size-3" /> Volver a {formatMonthShort(currentMonth)}

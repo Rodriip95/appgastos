@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ArrowDownLeft, ArrowUpRight, PiggyBank, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, DollarSign, PiggyBank, TrendingDown, TrendingUp } from "lucide-react";
+import { rateLabel, type UsdRate } from "@/lib/finance/currency";
 import { formatMoney, formatMonthShort } from "@/lib/finance/format";
 import { changePct, type MonthSummary } from "@/lib/finance/summary";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,8 @@ type Props = {
   projection?: number | null;
   /** Neto apartado para metas en lo que se ve (aportes − retiros) */
   saved?: number;
+  /** Cotización de hoy, para la referencia del total en pesos */
+  usdRate?: UsdRate | null;
   /** Botón para registrar un ingreso (va en el total de ingresos) */
   incomeAction?: ReactNode;
   /** Botón para registrar un gasto (va en el total de gastos) */
@@ -29,11 +32,15 @@ export function BalanceCard({
   previous,
   projection,
   saved = 0,
+  usdRate,
   incomeAction,
   expenseAction,
 }: Props) {
-  const { income, expense, balance } = summary;
-  const spentPct = income > 0 ? Math.round((expense / income) * 100) : null;
+  // Los totales grandes son los pesos; los dólares van aparte (no se mezclan monedas).
+  // El porcentaje gastado sí usa todo junto en pesos, porque es una proporción.
+  const { income, expense, balance } = summary.ars;
+  const usd = summary.usd;
+  const spentPct = summary.income > 0 ? Math.round((summary.expense / summary.income) * 100) : null;
   const prevLabel = previous ? formatMonthShort(previous.month).toLowerCase() : "";
 
   return (
@@ -63,7 +70,7 @@ export function BalanceCard({
             {spentPct > 100
               ? `Gastaste ${spentPct - 100}% más de lo que ingresó`
               : `Gastaste el ${spentPct}% de tus ingresos`}
-            {projection ? ` · Al ritmo actual cerrarías en ${formatMoney(projection)}` : ""}
+            {projection ? ` · Al ritmo actual cerrarías en ${usd ? "≈ " : ""}${formatMoney(projection)}` : ""}
           </p>
         </div>
       )}
@@ -82,6 +89,37 @@ export function BalanceCard({
             </strong>
           </span>
         </p>
+      )}
+
+      {usd && (
+        <div className="mt-3 rounded-2xl bg-primary-foreground/10 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-2 text-xs text-primary-foreground/70">
+              <span className="grid size-6 place-items-center rounded-full bg-primary-foreground/15">
+                <DollarSign className="size-3.5" />
+              </span>
+              En dólares
+            </p>
+            <p
+              className={cn(
+                "text-lg font-semibold tabular-nums",
+                usd.balance < 0 && "text-rose-300 dark:text-rose-600",
+              )}
+            >
+              {formatMoney(usd.balance, "USD")}
+            </p>
+          </div>
+          <p className="mt-1 text-xs text-primary-foreground/70 tabular-nums">
+            Ingresos {formatMoney(usd.income, "USD")} · Gastos {formatMoney(usd.expense, "USD")}
+          </p>
+          <p className="mt-2 border-t border-primary-foreground/15 pt-2 text-xs text-primary-foreground/70">
+            Todo en pesos ≈{" "}
+            <strong className="font-semibold text-primary-foreground tabular-nums">
+              {formatMoney(Math.round(summary.balance))}
+            </strong>
+            {usdRate && ` · Hoy ${rateLabel(usdRate.kind)} ${formatMoney(Math.round(usdRate.rate))}`}
+          </p>
+        </div>
       )}
 
       <div id={BALANCE_ACTIONS_ID} className="mt-5 grid grid-cols-2 gap-3">

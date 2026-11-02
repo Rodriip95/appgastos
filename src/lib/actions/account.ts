@@ -16,6 +16,7 @@ const PERSONAL = [
   "transactions",
   "categories",
   "cards",
+  "cardPayments",
   "goals",
   "goalMovements",
   "contacts",

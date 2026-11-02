@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ChevronRight, CreditCard as CreditCardIcon } from "lucide-react";
 import { CATEGORY_COLORS } from "@/components/categories/CategoryIcon";
-import { activePurchases, daysBetween, nextDueDate, statementTotal } from "@/lib/finance/cards";
-import { formatMoney, formatShortDate } from "@/lib/finance/format";
+import { activePurchases, daysBetween, nextDueDate, statementKey, statementTotal } from "@/lib/finance/cards";
+import { formatTotals } from "@/lib/finance/currency";
+import { formatShortDate } from "@/lib/finance/format";
 import type { CreditCard, Transaction } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -11,13 +12,15 @@ type Props = {
   /** Cuotas de tarjeta desde el mes actual en adelante */
   upcoming: Transaction[];
   today: string;
+  /** Resúmenes pagados (`cardId:YYYY-MM`) */
+  paidStatements: string[];
 };
 
 const whenLabel = (days: number) =>
   days === 0 ? "hoy" : days === 1 ? "mañana" : `en ${days} días`;
 
 /** Tarjetas del usuario en la home: próximo vencimiento y cuotas activas. */
-export function CardsStrip({ cards, upcoming, today }: Props) {
+export function CardsStrip({ cards, upcoming, today, paidStatements }: Props) {
   if (cards.length === 0) return null;
 
   return (
@@ -39,11 +42,12 @@ export function CardsStrip({ cards, upcoming, today }: Props) {
           const days = daysBetween(today, due);
           const amount = statementTotal(card.id, due.slice(0, 7), upcoming);
           const purchases = activePurchases(card.id, upcoming).length;
+          const paid = paidStatements.includes(statementKey(card.id, due.slice(0, 7)));
 
           return (
             <li key={card.id} className={cn("shrink-0 snap-start", cards.length === 1 ? "w-full" : "w-64")}>
               <Link
-                href="/tarjetas"
+                href={`/tarjetas/${card.id}?m=${due.slice(0, 7)}`}
                 className={cn(
                   "relative flex h-36 flex-col justify-between overflow-hidden rounded-2xl p-4 text-white shadow-sm transition active:scale-[0.98]",
                   CATEGORY_COLORS[card.color]?.solid ?? "bg-slate-500",
@@ -66,9 +70,16 @@ export function CardsStrip({ cards, upcoming, today }: Props) {
 
                 <div className="relative">
                   <p className="text-xs text-white/80">
-                    Vence {formatShortDate(due)} · {whenLabel(days)}
+                    {paid ? "Pagado" : `Vence ${formatShortDate(due)} · ${whenLabel(days)}`}
                   </p>
-                  <p className="text-2xl font-semibold tracking-tight tabular-nums">{formatMoney(amount)}</p>
+                  <p
+                    className={cn(
+                      "truncate font-semibold tracking-tight tabular-nums",
+                      amount.usd > 0 && amount.ars > 0 ? "text-xl" : "text-2xl",
+                    )}
+                  >
+                    {formatTotals(amount)}
+                  </p>
                   <p className="text-xs text-white/70">
                     {purchases === 0
                       ? "Sin cuotas pendientes"

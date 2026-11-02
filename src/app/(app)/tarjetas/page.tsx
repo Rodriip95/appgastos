@@ -1,11 +1,14 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { io } from "next/cache";
-import { CreditCard as CreditCardIcon } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, CreditCard as CreditCardIcon, ListChecks } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_COLORS } from "@/components/categories/CategoryIcon";
 import { EditCardButton, NewCardButton } from "@/components/cards/CardSheets";
 import { ImportStatementButton } from "@/components/cards/StatementImport";
+import { StatementPaidButton } from "@/components/cards/CardDetail";
+import { getPaidStatements } from "@/lib/data/card-payments";
 import { getCategories } from "@/lib/data/categories";
 import { getStatementQuota } from "@/lib/data/statement-quota";
 import { getCards } from "@/lib/data/cards";
@@ -14,8 +17,10 @@ import {
   activePurchases,
   daysBetween,
   nextDueDate,
+  statementKey,
   statementTotal,
 } from "@/lib/finance/cards";
+import { formatTotals } from "@/lib/finance/currency";
 import { formatMoney, formatMonthShort, formatShortDate, shiftMonth, todayKey } from "@/lib/finance/format";
 import type { Category, CreditCard, Transaction } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
@@ -50,11 +55,12 @@ export default function CardsPage() {
 async function CardsContent() {
   await io(); // "hoy" se calcula en cada request
   const today = todayKey();
-  const [cards, upcoming, categories, quota] = await Promise.all([
+  const [cards, upcoming, categories, quota, paidStatements] = await Promise.all([
     getCards(),
     getUpcomingCardTransactions(today.slice(0, 7)),
     getCategories(),
     getStatementQuota(),
+    getPaidStatements(),
   ]);
 
   if (cards.length === 0) return <EmptyCards categories={categories} quota={quota} />;
@@ -70,7 +76,7 @@ async function CardsContent() {
       <ul className="grid gap-4 md:grid-cols-2">
         {cards.map((card) => (
           <li key={card.id}>
-            <CardSummary card={card} upcoming={upcoming} today={today} />
+            <CardSummary card={card} upcoming={upcoming} today={today} paidStatements={paidStatements} />
           </li>
         ))}
       </ul>
@@ -82,10 +88,12 @@ function CardSummary({
   card,
   upcoming,
   today,
+  paidStatements,
 }: {
   card: CreditCard;
   upcoming: Transaction[];
   today: string;
+  paidStatements: string[];
 }) {
   const due = nextDueDate(card, today);
   const daysLeft = daysBetween(today, due);
@@ -94,8 +102,11 @@ function CardSummary({
     const month = shiftMonth(due.slice(0, 7), i);
     return { month, total: statementTotal(card.id, month, upcoming) };
   });
-  const max = Math.max(...months.map((m) => m.total), 1);
+  // La barra compara los pesos (o los dólares, si la tarjeta solo tiene consumos en dólares).
+  const barCurrency = months.some((m) => m.total.ars > 0) ? "ars" : "usd";
+  const max = Math.max(...months.map((m) => m.total[barCurrency]), 1);
   const purchases = activePurchases(card.id, upcoming);
+  const paid = paidStatements.includes(statementKey(card.id, due.slice(0, 7)));
 
   return (
     <section className="space-y-4 rounded-3xl border bg-card p-4">
@@ -121,59 +132,94 @@ function CardSummary({
 
       <div
         className={cn(
-          "rounded-2xl p-3",
-          daysLeft <= 2 ? "bg-rose-50 dark:bg-rose-500/10" : daysLeft <= 7 ? "bg-amber-50 dark:bg-amber-500/10" : "bg-muted",
+          "flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3",
+          paid
+            ? "bg-emerald-50 dark:bg-emerald-500/10"
+            : daysLeft <= 2
+              ? "bg-rose-50 dark:bg-rose-500/10"
+              : daysLeft <= 7
+                ? "bg-amber-50 dark:bg-amber-500/10"
+                : "bg-muted",
         )}
       >
-        <p className="text-xs text-muted-foreground">
-          Próximo vencimiento: {formatShortDate(due)} (
-          {daysLeft === 0 ? "hoy" : daysLeft === 1 ? "mañana" : `en ${daysLeft} días`})
-        </p>
-        <p className="mt-0.5 text-2xl font-semibold tabular-nums">{formatMoney(dueAmount)}</p>
-      </div>
-
-      <div className="space-y-1.5">
-        <h3 className="text-sm font-medium">Próximos resúmenes</h3>
-        <ul className="space-y-1">
-          {months.map(({ month, total }) => (
-            <li key={month} className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-xs">
-              <span className="text-muted-foreground">{formatMonthShort(month)}</span>
-              <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <span
-                  className={cn("block h-full rounded-full", CATEGORY_COLORS[card.color]?.solid)}
-                  style={{ width: `${(total / max) * 100}%` }}
-                />
-              </span>
-              <span className="text-right font-medium tabular-nums">{formatMoney(total)}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="space-y-1.5">
-        <h3 className="text-sm font-medium">Compras en cuotas</h3>
-        {purchases.length === 0 ? (
+        <div>
           <p className="text-xs text-muted-foreground">
-            Sin cuotas pendientes. Carga una compra con el botón Gasto en el Resumen y elige esta tarjeta.
+            {paid ? "Pagado · vence" : "Próximo vencimiento:"} {formatShortDate(due)}
+            {!paid && ` (${daysLeft === 0 ? "hoy" : daysLeft === 1 ? "mañana" : `en ${daysLeft} días`})`}
           </p>
-        ) : (
-          <ul className="divide-y rounded-2xl border">
-            {purchases.map((p) => (
-              <li key={p.purchaseId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{p.note || "Compra sin descripción"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {p.installments > 1
-                      ? `Quedan ${p.remaining} de ${p.installments} cuotas de ${formatMoney(p.perInstallment)}`
-                      : "Un pago"}
-                  </p>
-                </div>
-                <span className="shrink-0 font-semibold tabular-nums">{formatMoney(p.remainingAmount)}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-0.5 text-2xl font-semibold tabular-nums">{formatTotals(dueAmount)}</p>
+        </div>
+        {(dueAmount.ars > 0 || dueAmount.usd > 0 || paid) && (
+          <StatementPaidButton cardId={card.id} month={due.slice(0, 7)} paid={paid} className="h-9" />
         )}
       </div>
+
+      <Link
+        href={`/tarjetas/${card.id}?m=${due.slice(0, 7)}`}
+        className="flex h-10 items-center justify-center gap-1.5 rounded-xl border text-sm font-medium transition hover:bg-muted"
+      >
+        <ListChecks className="size-4" /> Ver y editar consumos
+      </Link>
+
+      {/* Lo demás va plegado para que la tarjeta no abrume */}
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl px-1 py-1.5 text-sm text-muted-foreground transition hover:text-foreground [&::-webkit-details-marker]:hidden">
+          <span>
+            Próximos resúmenes y cuotas
+            {purchases.length > 0 && ` · ${purchases.length} ${purchases.length === 1 ? "compra" : "compras"}`}
+          </span>
+          <ChevronDown className="size-4 transition group-open:rotate-180" aria-hidden />
+        </summary>
+        <div className="mt-3 space-y-4">
+          <div className="space-y-1.5">
+            <h3 className="text-sm font-medium">Próximos resúmenes</h3>
+            <ul className="space-y-1">
+              {months.map(({ month, total }) => (
+                <li key={month} className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-2 text-xs">
+                  <Link
+                    href={`/tarjetas/${card.id}?m=${month}`}
+                    className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    {formatMonthShort(month)}
+                  </Link>
+                  <span className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <span
+                      className={cn("block h-full rounded-full", CATEGORY_COLORS[card.color]?.solid)}
+                      style={{ width: `${(total[barCurrency] / max) * 100}%` }}
+                    />
+                  </span>
+                  <span className="text-right font-medium tabular-nums">{formatTotals(total)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-sm font-medium">Compras en cuotas</h3>
+            {purchases.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Sin cuotas pendientes. Carga una compra con el botón Gasto en el Resumen y elige esta tarjeta.
+              </p>
+            ) : (
+              <ul className="divide-y rounded-2xl border">
+                {purchases.map((p) => (
+                  <li key={p.purchaseId} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{p.alias || p.note || "Compra sin descripción"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {p.installments > 1
+                          ? `Quedan ${p.remaining} de ${p.installments} cuotas de ${formatMoney(p.perInstallment, p.currency)}`
+                          : "Un pago"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 font-semibold tabular-nums">{formatMoney(p.remainingAmount, p.currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </details>
     </section>
   );
 }

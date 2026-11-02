@@ -2,6 +2,9 @@ import type { ColorKey, IconKey } from "@/lib/finance/catalog";
 
 export type TxType = "income" | "expense";
 
+/** Moneda de un movimiento. Los que no la tienen guardada son pesos. */
+export type Currency = "ARS" | "USD";
+
 export type Subcategory = { id: string; name: string };
 
 export type Category = {
@@ -19,7 +22,14 @@ export type Category = {
 export type Transaction = {
   id: string;
   type: TxType;
+  /** Monto en la moneda del movimiento (`currency`) */
   amount: number;
+  currency: Currency;
+  /**
+   * Pesos por dólar guardados al registrar un movimiento en USD (para el equivalente
+   * en pesos); null en pesos o si no se pudo obtener la cotización.
+   */
+  arsRate: number | null;
   /** YYYY-MM-DD */
   date: string;
   /** YYYY-MM, derivado de `date`; se usa para consultar por mes */
@@ -27,6 +37,11 @@ export type Transaction = {
   categoryId: string | null;
   subcategoryId: string | null;
   note: string;
+  /**
+   * Alias corto de un consumo con tarjeta ("Zapatillas running") para reconocerlo cuando
+   * la descripción es el nombre del comercio; vacío si no tiene.
+   */
+  alias: string;
   /** Gasto/ingreso fijo: se propone registrarlo cada mes */
   recurring: boolean;
   /** Tarjeta con la que se pagó (solo gastos) */

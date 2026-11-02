@@ -1,8 +1,12 @@
-import type { Category, Transaction, TxType } from "@/lib/finance/types";
+import { toArs } from "@/lib/finance/currency";
+import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
 
 export type BreakdownRow = {
+  /** id de la categoría, "none" o `card:<id>` si agrupa los consumos de una tarjeta */
   key: string;
   category: Category | null;
+  /** Tarjeta cuyos consumos agrupa la fila (solo con `groupCards`) */
+  card: Pick<CreditCard, "id" | "name" | "color"> | null;
   total: number;
   /** 0–100 respecto del total del tipo */
   pct: number;
@@ -11,46 +15,85 @@ export type BreakdownRow = {
   subs: { key: string; name: string; total: number }[];
 };
 
-export type MonthSummary = {
-  income: number;
-  expense: number;
-  balance: number;
+export type Totals = { income: number; expense: number; balance: number };
+
+/**
+ * Totales de un conjunto de movimientos. `income`/`expense`/`balance` y el desglose están
+ * en pesos, con los dólares sumados por su equivalente (cotización guardada en cada uno).
+ * `ars` y `usd` separan lo que efectivamente fue en cada moneda; `usd` es null si no hubo dólares.
+ */
+export type MonthSummary = Totals & {
+  ars: Totals;
+  usd: Totals | null;
   breakdown: Record<TxType, BreakdownRow[]>;
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Con `groupCards`, los gastos con tarjeta van en una fila por tarjeta (con un renglón por
+ * consumo: su alias o, si no tiene, la categoría) en vez de repartirse en las categorías.
+ */
 export function summarizeMonth(
   transactions: Transaction[],
   categories: Category[],
   prevTransactions: Transaction[] = [],
+  { groupCards }: { groupCards?: CreditCard[] } = {},
 ): MonthSummary {
   const byId = new Map(categories.map((c) => [c.id, c]));
+  const cardById = new Map((groupCards ?? []).map((c) => [c.id, c]));
+  const cardOf = (tx: Transaction) => (tx.type === "expense" && tx.cardId && cardById.get(tx.cardId)) || null;
   const totals: Record<TxType, number> = { income: 0, expense: 0 };
+  const byCurrency = { ARS: { income: 0, expense: 0 }, USD: { income: 0, expense: 0 } };
+  let hasUsd = false;
   const groups: Record<TxType, Map<string, BreakdownRow>> = { income: new Map(), expense: new Map() };
 
   for (const tx of transactions) {
-    totals[tx.type] += tx.amount;
+    const value = toArs(tx);
+    totals[tx.type] += value;
+    byCurrency[tx.currency][tx.type] += tx.amount;
+    if (tx.currency === "USD") hasUsd = true;
 
     const category = (tx.categoryId && byId.get(tx.categoryId)) || null;
+    const card = cardOf(tx);
+    if (card) {
+      const key = `card:${card.id}`;
+      const row = groups.expense.get(key) ?? {
+        key,
+        category: null,
+        card: { id: card.id, name: card.name, color: card.color },
+        total: 0,
+        pct: 0,
+        prevTotal: 0,
+        subs: [],
+      };
+      row.total += value;
+      const cuota = tx.installment && tx.installment.total > 1 ? ` · ${tx.installment.n}/${tx.installment.total}` : "";
+      row.subs.push({ key: tx.id, name: `${tx.alias || category?.name || "Sin categoría"}${cuota}`, total: value });
+      groups.expense.set(key, row);
+      continue;
+    }
     const key = category?.id ?? "none";
-    const row = groups[tx.type].get(key) ?? { key, category, total: 0, pct: 0, prevTotal: 0, subs: [] };
-    row.total += tx.amount;
+    const row = groups[tx.type].get(key) ?? { key, category, card: null, total: 0, pct: 0, prevTotal: 0, subs: [] };
+    row.total += value;
 
     const subName =
       category?.subcategories.find((s) => s.id === tx.subcategoryId)?.name ?? "Sin subcategoría";
     const subKey = tx.subcategoryId ?? "none";
     const sub = row.subs.find((s) => s.key === subKey);
-    if (sub) sub.total += tx.amount;
-    else row.subs.push({ key: subKey, name: subName, total: tx.amount });
+    if (sub) sub.total += value;
+    else row.subs.push({ key: subKey, name: subName, total: value });
 
     groups[tx.type].set(key, row);
   }
 
   const prevByKey = new Map<string, number>();
   for (const tx of prevTransactions) {
-    const key = `${tx.type}:${(tx.categoryId && byId.has(tx.categoryId) && tx.categoryId) || "none"}`;
-    prevByKey.set(key, (prevByKey.get(key) ?? 0) + tx.amount);
+    const card = cardOf(tx);
+    const key = card
+      ? `expense:card:${card.id}`
+      : `${tx.type}:${(tx.categoryId && byId.has(tx.categoryId) && tx.categoryId) || "none"}`;
+    prevByKey.set(key, (prevByKey.get(key) ?? 0) + toArs(tx));
   }
 
   const toRows = (type: TxType) =>
@@ -64,10 +107,16 @@ export function summarizeMonth(
       }))
       .sort((a, b) => b.total - a.total);
 
+  const toTotals = (t: Record<TxType, number>): Totals => ({
+    income: round2(t.income),
+    expense: round2(t.expense),
+    balance: round2(t.income - t.expense),
+  });
+
   return {
-    income: round2(totals.income),
-    expense: round2(totals.expense),
-    balance: round2(totals.income - totals.expense),
+    ...toTotals(totals),
+    ars: toTotals(byCurrency.ARS),
+    usd: hasUsd ? toTotals(byCurrency.USD) : null,
     breakdown: { income: toRows("income"), expense: toRows("expense") },
   };
 }

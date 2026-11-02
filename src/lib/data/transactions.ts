@@ -10,11 +10,14 @@ export function toTransaction(doc: QueryDocumentSnapshot): Transaction {
     id: doc.id,
     type: d.type === "income" ? "income" : "expense",
     amount: Number(d.amount) || 0,
+    currency: d.currency === "USD" ? "USD" : "ARS",
+    arsRate: d.currency === "USD" && Number(d.arsRate) > 0 ? Number(d.arsRate) : null,
     date: d.date,
     month: d.month,
     categoryId: d.categoryId ?? null,
     subcategoryId: d.subcategoryId ?? null,
     note: d.note ?? "",
+    alias: d.alias ?? "",
     recurring: d.recurring === true,
     cardId: d.cardId ?? null,
     purchaseId: d.purchaseId ?? null,
@@ -71,4 +74,14 @@ export async function getUpcomingCardTransactions(fromMonth: string): Promise<Tr
     .map(toTransaction)
     .filter((t) => t.cardId)
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Todas las cuotas de una tarjeta, de la más antigua a la más reciente. */
+export async function getCardTransactions(cardId: string): Promise<Transaction[]> {
+  const { uid } = await verifySession();
+  // Igualdad sobre un solo campo: no requiere índice compuesto.
+  const snap = await userCollection(uid, "transactions").where("cardId", "==", cardId).get();
+  return snap.docs
+    .map(toTransaction)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
 }

@@ -1,4 +1,5 @@
 import { APP_CURRENCY, APP_LOCALE, APP_TIME_ZONE } from "@/lib/config";
+import type { Currency } from "@/lib/finance/types";
 
 const moneyInt = new Intl.NumberFormat(APP_LOCALE, {
   style: "currency",
@@ -12,7 +13,17 @@ const moneyDec = new Intl.NumberFormat(APP_LOCALE, {
   maximumFractionDigits: 2,
 });
 
-export function formatMoney(value: number): string {
+const usdInt = new Intl.NumberFormat(APP_LOCALE, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const usdDec = new Intl.NumberFormat(APP_LOCALE, {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+/** "$ 1.500" en pesos (la moneda de la app) o "US$ 20,50" en dólares. */
+export function formatMoney(value: number, currency: Currency = "ARS"): string {
+  if (currency === "USD") return Number.isInteger(value) ? usdInt.format(value) : usdDec.format(value);
   return Number.isInteger(value) ? moneyInt.format(value) : moneyDec.format(value);
 }
 

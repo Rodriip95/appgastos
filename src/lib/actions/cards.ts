@@ -7,6 +7,8 @@ import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { toCard } from "@/lib/data/cards";
 import { DOC_ID_RE, userCollection } from "@/lib/data/collections";
+import { getUsdRate } from "@/lib/data/fx";
+import { USD_CARD_REFERENCE } from "@/lib/config";
 import { installmentSchedule } from "@/lib/finance/cards";
 import { COLOR_KEYS } from "@/lib/finance/catalog";
 import type { ActionResult } from "@/lib/finance/types";
@@ -29,16 +31,24 @@ const purchaseSchema = z.object({
     .number("Ingresa un monto válido")
     .positive("El monto debe ser mayor a 0")
     .max(1e12, "Monto demasiado grande"),
+  currency: z.enum(["ARS", "USD"]).default("ARS"),
   installments: z.number().int().min(1, "Mínimo 1 cuota").max(48, "Máximo 48 cuotas"),
   date: z.iso.date("Fecha inválida"),
   categoryId: z.string().regex(DOC_ID_RE).nullable(),
   subcategoryId: z.string().max(64).nullable(),
   note: z.string().trim().max(120, "Descripción muy larga").default(""),
+  alias: z.string().trim().max(40, "Alias muy largo").default(""),
 });
 
 export type CardPurchaseInput = z.input<typeof purchaseSchema>;
 
-const purchaseEditSchema = purchaseSchema.pick({ categoryId: true, subcategoryId: true, note: true });
+const purchaseEditSchema = purchaseSchema
+  .pick({ categoryId: true, subcategoryId: true, note: true, alias: true })
+  .extend({
+    /** Nuevo monto por cuota; se aplica desde `fromMonth` (o a todas si no viene) */
+    amount: purchaseSchema.shape.amount.optional(),
+    fromMonth: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  });
 
 export type CardPurchaseEditInput = z.input<typeof purchaseEditSchema>;
 
@@ -118,6 +128,8 @@ export async function createCardPurchase(
     if (!category.ok) return category;
 
     const schedule = installmentSchedule(toCard(cardDoc), p.date, p.amount, p.installments);
+    // Una compra en dólares con tarjeta, pagada en pesos, sale al dólar tarjeta.
+    const arsRate = p.currency === "USD" ? ((await getUsdRate(USD_CARD_REFERENCE))?.rate ?? null) : null;
     firstMonth = schedule[0].month;
     const purchaseId = randomUUID();
     const col = userCollection(uid, "transactions");
@@ -126,11 +138,14 @@ export async function createCardPurchase(
       batch.set(col.doc(), {
         type: "expense",
         amount: cuota.amount,
+        currency: p.currency,
+        arsRate,
         date: cuota.date,
         month: cuota.month,
         categoryId: p.categoryId,
         subcategoryId: category.subcategoryId,
         note: p.note,
+        alias: p.alias,
         cardId: p.cardId,
         purchaseId,
         purchaseDate: p.date,
@@ -147,7 +162,10 @@ export async function createCardPurchase(
   return { ok: true, firstMonth };
 }
 
-/** Cambia categoría y descripción en todas las cuotas de una compra. */
+/**
+ * Cambia categoría, descripción y alias en todas las cuotas de una compra y, si viene
+ * `amount`, el monto de cada cuota desde `fromMonth` en adelante (corrige una carga mal hecha).
+ */
 export async function updateCardPurchase(
   purchaseId: string,
   input: CardPurchaseEditInput,
@@ -163,11 +181,15 @@ export async function updateCardPurchase(
     const snap = await userCollection(uid, "transactions").where("purchaseId", "==", purchaseId).get();
     if (snap.empty) return fail("La compra ya no existe");
     const batch = snap.query.firestore.batch();
+    const { amount, fromMonth } = parsed.data;
     for (const doc of snap.docs) {
+      const changeAmount = amount !== undefined && (!fromMonth || (doc.get("month") as string) >= fromMonth);
       batch.update(doc.ref, {
         categoryId: parsed.data.categoryId,
         subcategoryId: category.subcategoryId,
         note: parsed.data.note,
+        alias: parsed.data.alias,
+        ...(changeAmount ? { amount } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       });
     }
@@ -192,6 +214,32 @@ export async function deleteCardPurchase(purchaseId: string): Promise<ActionResu
   } catch (error) {
     console.error("[cards] delete purchase:", error);
     return fail("No pudimos eliminar la compra");
+  }
+  refresh();
+  return { ok: true };
+}
+
+const monthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Mes inválido");
+
+/**
+ * Marca (o desmarca) como pagado el resumen de una tarjeta que vence en `month`.
+ * Hasta que se paga, sus cuotas no cuentan como gasto en el balance.
+ */
+export async function setStatementPaid(cardId: string, month: string, paid: boolean): Promise<ActionResult> {
+  const { uid } = await verifySession();
+  if (!idSchema.safeParse(cardId).success) return fail("Tarjeta inválida");
+  if (!monthSchema.safeParse(month).success) return fail("Mes inválido");
+  try {
+    const ref = userCollection(uid, "cardPayments").doc(`${cardId}_${month}`);
+    if (paid) {
+      if (!(await userCollection(uid, "cards").doc(cardId).get()).exists) return fail("La tarjeta ya no existe");
+      await ref.set({ cardId, month, paidAt: FieldValue.serverTimestamp() });
+    } else {
+      await ref.delete();
+    }
+  } catch (error) {
+    console.error("[cards] statement paid:", error);
+    return fail("No pudimos actualizar el resumen");
   }
   refresh();
   return { ok: true };

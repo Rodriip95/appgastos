@@ -14,7 +14,7 @@ import {
 } from "@/components/transactions/TransactionSheet";
 import { bingoMessages } from "@/lib/finance/bingo";
 import { upcomingDeliveries, type Order } from "@/lib/finance/business";
-import { upcomingDues } from "@/lib/finance/cards";
+import { countedTransactions, upcomingDues } from "@/lib/finance/cards";
 import { netSaved } from "@/lib/finance/goals";
 import { balanceViewQuery, type BalanceView } from "@/lib/finance/balance-view";
 import { formatMonth, formatMonthShort, formatShortDate, shiftMonth } from "@/lib/finance/format";
@@ -24,6 +24,7 @@ import {
   projectMonthExpense,
   summarizeMonth,
 } from "@/lib/finance/summary";
+import type { UsdRate } from "@/lib/finance/currency";
 import type { Category, CreditCard, Goal, GoalMovement, Transaction } from "@/lib/finance/types";
 
 export type DashboardData = {
@@ -43,6 +44,8 @@ export type DashboardData = {
   goals: Goal[];
   /** Aportes y retiros de metas en el mes que se ve */
   goalMovements: GoalMovement[];
+  /** Resúmenes de tarjeta pagados (`cardId:YYYY-MM`); solo esos cuentan como gasto */
+  paidStatements: string[];
 };
 
 type Props = DashboardData & {
@@ -54,6 +57,8 @@ type Props = DashboardData & {
   view: BalanceView;
   /** Lo que muestra la vista general o de período; null en la vista mensual */
   range: { transactions: Transaction[]; goalMovements: GoalMovement[] } | null;
+  /** Cotización de hoy del dólar de referencia (null si la API no respondió) */
+  usdRate: UsdRate | null;
 };
 
 /** Vista del mes. Solo presentación: los datos llegan de `(app)/page.tsx`. */
@@ -74,11 +79,17 @@ export function DashboardView({
   filterKey,
   view,
   range,
+  usdRate,
+  paidStatements,
 }: Props) {
-  const summary = summarizeMonth(transactions, categories, prevTransactions);
-  const prevSummary = summarizeMonth(prevTransactions, categories);
+  // Las cuotas de un resumen sin pagar todavía no son gasto: se ven en la lista, pero no suman.
+  const counted = (list: Transaction[]) => countedTransactions(list, cards, paidStatements);
+  const monthCounted = counted(transactions);
+  const prevCounted = counted(prevTransactions);
+  const summary = summarizeMonth(monthCounted, categories, prevCounted);
+  const prevSummary = summarizeMonth(prevCounted, categories);
   const isCurrent = month === currentMonth;
-  const dues = upcomingDues(cards, upcomingCardTransactions, today);
+  const dues = upcomingDues(cards, upcomingCardTransactions, today, 7, paidStatements);
   const pending = isCurrent ? pendingRecurring(prevTransactions, transactions) : [];
   const usage = categoryUsage([...prevTransactions, ...transactions]);
   const projection = projectMonthExpense(summary.expense, today, month);
@@ -91,7 +102,7 @@ export function DashboardView({
         hasPrev: prevTransactions.length > 0,
         projection,
         categories,
-        transactions,
+        transactions: monthCounted,
         dues,
         pendingRecurring: pending,
         goals,
@@ -101,7 +112,14 @@ export function DashboardView({
 
   // En general y período se reemplaza solo lo que se ve; el asistente sigue mirando el mes.
   const shown = range?.transactions ?? transactions;
-  const shownSummary = range ? summarizeMonth(range.transactions, categories) : summary;
+  const shownCounted = range ? counted(range.transactions) : monthCounted;
+  const shownSummary = range ? summarizeMonth(shownCounted, categories) : summary;
+  // En "¿En qué se fue?" cada tarjeta va en una sola fila, con sus consumos adentro.
+  const breakdownSummary = summarizeMonth(shownCounted, categories, range ? [] : prevCounted, {
+    groupCards: cards,
+  });
+  const cardHref = (cardId: string) =>
+    `/tarjetas/${cardId}${view.kind === "month" ? `?m=${month}` : ""}`;
   const scopeLabel =
     view.kind === "general"
       ? "tu historial"
@@ -163,25 +181,39 @@ export function DashboardView({
               summary={shownSummary}
               previous={
                 !range && prevTransactions.length > 0
-                  ? { income: prevSummary.income, expense: prevSummary.expense, month: shiftMonth(month, -1) }
+                  ? { ...prevSummary.ars, month: shiftMonth(month, -1) }
                   : undefined
               }
+              usdRate={usdRate}
               projection={range ? null : projection}
               saved={netSaved(range?.goalMovements ?? goalMovements)}
               incomeAction={<QuickAddButton type="income" />}
               expenseAction={<QuickAddButton type="expense" />}
             />
             <RecurringSuggestions pending={pending} categories={categories} />
-            {isCurrent && <CardsStrip cards={cards} upcoming={upcomingCardTransactions} today={today} />}
+            {isCurrent && (
+              <CardsStrip
+                cards={cards}
+                upcoming={upcomingCardTransactions}
+                today={today}
+                paidStatements={paidStatements}
+              />
+            )}
             {isCurrent && <GoalsStrip goals={goals} href="/ahorros" />}
             {!range && <BudgetsCard categories={categories} summary={summary} />}
             {shown.length > 0 && (
-              <Breakdown summary={shownSummary} filterHref={(key) => `${hrefWith(`c=${key}`)}#movimientos`} />
+              <Breakdown
+                summary={breakdownSummary}
+                filterHref={(key) => `${hrefWith(`c=${key}`)}#movimientos`}
+                cardHref={cardHref}
+              />
             )}
           </div>
           <TransactionList
             transactions={shown}
             categories={categories}
+            cards={cards}
+            paidStatements={paidStatements}
             scopeLabel={scopeLabel}
             today={today}
             filterKey={filterKey}

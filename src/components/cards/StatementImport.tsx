@@ -33,8 +33,8 @@ const toRow = (it: StatementItem): Row => ({
   amount: formatAmountInput(String(it.amount).replace(".", ",")),
   installment: String(it.installment),
   installments: String(it.installments),
-  // Lo que está en dólares o parece ya cargado arranca sin marcar.
-  selected: it.currency === "ARS" && !it.duplicate,
+  // Lo que parece ya cargado arranca sin marcar. Lo que está en dólares se carga en dólares.
+  selected: !it.duplicate,
 });
 
 /** Opción del selector para crear la tarjeta con los datos del resumen. */
@@ -130,7 +130,10 @@ function StatementImport({
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
   const selected = rows.filter((r) => r.selected);
-  const total = selected.reduce((s, r) => s + (parseAmount(r.amount) ?? 0), 0);
+  const totalOf = (currency: Row["currency"]) =>
+    selected.filter((r) => r.currency === currency).reduce((s, r) => s + (parseAmount(r.amount) ?? 0), 0);
+  const totalArs = totalOf("ARS");
+  const totalUsd = totalOf("USD");
 
   function save() {
     const items: StatementImportInput["items"] = [];
@@ -141,6 +144,7 @@ function StatementImport({
         date: r.date,
         note: r.note,
         amount,
+        currency: r.currency,
         installment: Number(r.installment),
         installments: Number(r.installments),
         categoryId: r.categoryId,
@@ -326,25 +330,34 @@ function StatementImport({
                   className="h-9"
                 />
               </div>
-              {(r.currency === "USD" || r.duplicate) && (
+              {r.duplicate && (
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  {r.currency === "USD"
-                    ? "Está en dólares: pasa el monto a pesos si lo quieres cargar."
-                    : "Parece que ya está cargado en este resumen."}
+                  Parece que ya está cargado en este resumen.
                 </p>
               )}
               <div className="grid grid-cols-[1fr_auto] gap-2">
                 <div className="space-y-1">
                   <span className="text-[11px] text-muted-foreground">
-                    {r.currency === "USD" ? "Cuota (US$ → pasar a $)" : "Cuota de este mes"}
+                    Cuota de este mes
                   </span>
-                  <Input
-                    inputMode="decimal"
-                    value={r.amount}
-                    onChange={(e) => update(r.key, { amount: formatAmountInput(e.target.value) })}
-                    aria-label="Monto"
-                    className="h-9 tabular-nums"
-                  />
+                  <div className="flex gap-1">
+                    <select
+                      value={r.currency}
+                      onChange={(e) => update(r.key, { currency: e.target.value === "USD" ? "USD" : "ARS" })}
+                      aria-label="Moneda"
+                      className={cn(selectClass, "w-17 shrink-0", r.currency === "USD" && "font-medium text-emerald-700 dark:text-emerald-400")}
+                    >
+                      <option value="ARS">$</option>
+                      <option value="USD">US$</option>
+                    </select>
+                    <Input
+                      inputMode="decimal"
+                      value={r.amount}
+                      onChange={(e) => update(r.key, { amount: formatAmountInput(e.target.value) })}
+                      aria-label="Monto"
+                      className="h-9 min-w-0 tabular-nums"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-[11px] text-muted-foreground">Cuota</span>
@@ -403,8 +416,17 @@ function StatementImport({
 
       <div className="sticky bottom-0 -mx-1 flex flex-col gap-2 bg-background px-1 pt-2 pb-1">
         <p className="text-center text-sm">
-          Total de este resumen: <span className="font-semibold tabular-nums">{formatMoney(total)}</span>
+          Total de este resumen:{" "}
+          <span className="font-semibold tabular-nums">
+            {formatMoney(totalArs)}
+            {totalUsd > 0 && ` + ${formatMoney(totalUsd, "USD")}`}
+          </span>
         </p>
+        {totalUsd > 0 && (
+          <p className="text-center text-xs text-muted-foreground">
+            Los consumos en dólares quedan en tu balance en dólares, con su equivalente al dólar tarjeta.
+          </p>
+        )}
         <Button className="h-11" onClick={save} disabled={pending || selected.length === 0 || !month}>
           {pending && <Loader2 className="animate-spin" />}
           Guardar {selected.length} {selected.length === 1 ? "consumo" : "consumos"}

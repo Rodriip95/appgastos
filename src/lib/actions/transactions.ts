@@ -5,6 +5,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { DOC_ID_RE, userCollection } from "@/lib/data/collections";
+import { getUsdRateFor } from "@/lib/data/fx";
+import { todayKey } from "@/lib/finance/format";
 import type { ActionResult } from "@/lib/finance/types";
 
 const transactionSchema = z.object({
@@ -13,6 +15,7 @@ const transactionSchema = z.object({
     .number("Ingresa un monto válido")
     .positive("El monto debe ser mayor a 0")
     .max(1e12, "Monto demasiado grande"),
+  currency: z.enum(["ARS", "USD"]).default("ARS"),
   date: z.iso.date("Fecha inválida"),
   categoryId: z.string().regex(DOC_ID_RE).nullable(),
   subcategoryId: z.string().max(64).nullable(),
@@ -45,10 +48,17 @@ async function parseAndValidate(uid: string, input: TransactionInput): Promise<P
     }
   }
 
+  // En dólares se guarda la cotización del día del movimiento, para el equivalente en pesos.
+  let arsRate: number | null = null;
+  if (tx.currency === "USD") {
+    arsRate = (await getUsdRateFor(tx.date, todayKey()))?.rate ?? null;
+  }
+
   return {
     ok: true,
     data: {
       ...tx,
+      arsRate,
       amount: Math.round(tx.amount * 100) / 100,
       month: tx.date.slice(0, 7),
       categoryId: tx.categoryId,

@@ -33,14 +33,14 @@ import {
   formatShortDate,
   parseAmount,
 } from "@/lib/finance/format";
-import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
+import type { Category, CreditCard, Currency, Transaction, TxType } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 /** Valores iniciales para un alta (repetir un movimiento o registrar un fijo). */
 export type TransactionPrefill = Pick<
   Transaction,
   "type" | "amount" | "categoryId" | "subcategoryId" | "note" | "recurring"
->;
+> & { currency?: Currency };
 
 type Props = {
   categories: Category[];
@@ -78,10 +78,12 @@ export function TransactionForm({
   const initial = transaction ?? prefill;
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType);
   const [amountText, setAmountText] = useState(initial ? amountToText(initial.amount) : "");
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "ARS");
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(initial?.subcategoryId ?? null);
   const [date, setDate] = useState(transaction?.date ?? defaultDate);
   const [note, setNote] = useState(initial?.note ?? "");
+  const [alias, setAlias] = useState(transaction?.alias ?? "");
   const [recurring, setRecurring] = useState(initial?.recurring ?? false);
   const [cardId, setCardId] = useState<string | null>(transaction?.cardId ?? null);
   const [installments, setInstallments] = useState(1);
@@ -132,7 +134,7 @@ export function TransactionForm({
     e.preventDefault();
     if (purchaseId) {
       startTransition(async () => {
-        const res = await updateCardPurchase(purchaseId, { categoryId, subcategoryId, note });
+        const res = await updateCardPurchase(purchaseId, { categoryId, subcategoryId, note, alias });
         if (!res.ok) {
           toast.error(res.error);
           return;
@@ -153,11 +155,13 @@ export function TransactionForm({
         const res = await createCardPurchase({
           cardId: card.id,
           amount,
+          currency,
           installments,
           date,
           categoryId,
           subcategoryId,
           note,
+          alias,
         });
         if (!res.ok) {
           toast.error(res.error);
@@ -178,7 +182,7 @@ export function TransactionForm({
     }
 
     startTransition(async () => {
-      const input = { type, amount, date, categoryId, subcategoryId, note, recurring };
+      const input = { type, amount, currency, date, categoryId, subcategoryId, note, recurring };
       const res = transaction
         ? await updateTransaction(transaction.id, input)
         : await createTransaction(input);
@@ -256,7 +260,8 @@ export function TransactionForm({
             className={cn("shrink-0 text-3xl font-semibold", isIncome ? "text-emerald-600" : "text-rose-600")}
             aria-hidden
           >
-            {isIncome ? "+" : "−"}$
+            {isIncome ? "+" : "−"}
+            {currency === "USD" ? "US$" : "$"}
           </span>
           {/* El texto invisible da el ancho exacto: signo y número quedan centrados juntos. */}
           <span className="inline-grid min-w-0 text-4xl font-semibold tabular-nums">
@@ -282,6 +287,33 @@ export function TransactionForm({
           </span>
         </div>
         {amountError && <p className="mt-1 text-sm text-destructive">Ingresa un monto mayor a 0</p>}
+        <div
+          role="radiogroup"
+          aria-label="Moneda"
+          className="mx-auto mt-1 inline-grid grid-cols-2 rounded-full bg-muted p-0.5 text-xs"
+        >
+          {(["ARS", "USD"] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={currency === c}
+              onClick={() => setCurrency(c)}
+              disabled={!!purchaseId}
+              className={cn(
+                "h-7 rounded-full px-3 font-medium transition",
+                currency === c ? "bg-background shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              {c === "ARS" ? "Pesos" : "Dólares"}
+            </button>
+          ))}
+        </div>
+        {currency === "USD" && !purchaseId && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Queda en tu balance en dólares, con su equivalente en pesos a la cotización del día.
+          </p>
+        )}
       </div>
 
       {/* Pago con tarjeta */}
@@ -290,8 +322,8 @@ export function TransactionForm({
           <CreditCardIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <p>
             Cuota {transaction.installment.n} de {transaction.installment.total}
-            {card ? ` con ${card.name}` : ""}. Los cambios de categoría y descripción se aplican a todas
-            las cuotas; para cambiar el monto, elimina la compra y vuelve a cargarla.
+            {card ? ` con ${card.name}` : ""}. Los cambios de categoría, descripción y alias se aplican a
+            todas las cuotas; el monto se corrige desde el detalle de la tarjeta.
           </p>
         </div>
       ) : (
@@ -345,10 +377,11 @@ export function TransactionForm({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {schedule
-                    ? `${installments === 1 ? "Un pago" : `${installments} cuotas`} de ${formatMoney(schedule[0].amount)}. ${
+                    ? `${installments === 1 ? "Un pago" : `${installments} cuotas`} de ${formatMoney(schedule[0].amount, currency)}. ${
                         installments === 1 ? "Vence" : "La primera vence"
                       } el ${formatShortDate(schedule[0].date)} (cierre día ${card.closingDay}).`
-                    : "Ingresa el monto total de la compra para ver las cuotas."}
+                    : "Ingresa el monto total de la compra para ver las cuotas."}{" "}
+                  Cuenta como gasto cuando marques ese resumen como pagado.
                 </p>
               </div>
             )}
@@ -458,6 +491,25 @@ export function TransactionForm({
           />
         </div>
       </div>
+
+      {(card || purchaseId) && (
+        <div className="space-y-1.5">
+          <Label htmlFor="tx-alias">
+            Alias <span className="font-normal text-muted-foreground">(opcional)</span>
+          </Label>
+          <Input
+            id="tx-alias"
+            value={alias}
+            onChange={(e) => setAlias(e.target.value)}
+            placeholder="Ej: Zapatillas running"
+            maxLength={40}
+            className="h-11 text-base"
+          />
+          <p className="text-xs text-muted-foreground">
+            Un nombre corto para reconocer el consumo cuando el resumen trae el nombre del comercio.
+          </p>
+        </div>
+      )}
 
       {!card && !purchaseId && (
         <label className="flex cursor-pointer items-center gap-3 rounded-2xl border p-3">

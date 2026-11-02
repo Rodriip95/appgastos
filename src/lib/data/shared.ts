@@ -20,6 +20,7 @@ export function toSpace(doc: DocumentSnapshot): SharedSpace {
     color: d.color ?? "slate",
     createdBy: d.createdBy ?? "",
     members,
+    currency: d.currency === "USD" ? "USD" : "ARS",
     subcategories: d.subcategories ?? [],
     goal:
       d.kind === "goal"

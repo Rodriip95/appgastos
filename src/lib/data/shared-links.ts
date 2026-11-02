@@ -73,7 +73,8 @@ async function sharedSummary(
             id: `shared:${spaceId}:${doc.id}`,
             type: "expense",
             amount: fromCents(mine),
-            currency: "ARS",
+            // En un espacio en dólares, mi parte va a mi balance en dólares (la home completa la cotización).
+            currency: space.currency,
             arsRate: null,
             date,
             month,
@@ -95,6 +96,7 @@ async function sharedSummary(
             id: `shared:${spaceId}:${doc.id}`,
             goalId: spaceId,
             amount: fromCents(type === "deposit" ? cents : -cents),
+            currency: space.currency,
             date,
             month,
             note: doc.get("note") ?? "",

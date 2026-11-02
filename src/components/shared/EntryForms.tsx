@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addGoalContribution, addSharedExpense, addSharedSettlement } from "@/lib/actions/shared";
 import { formatAmountInput, parseAmount, todayKey } from "@/lib/finance/format";
-import type { SharedMember, SharedSpace } from "@/lib/finance/types";
+import type { SharedMember, SharedSpace, Currency } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 function Segmented<T extends string>({
@@ -52,10 +52,12 @@ function AmountField({
   id,
   value,
   onChange,
+  currency,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
+  currency: Currency;
 }) {
   const { ref: amountRef, onFocus: onAmountFocus, focus: focusAmount } = useAmountInput();
 
@@ -69,7 +71,7 @@ function AmountField({
         onClick={focusAmount}
       >
         <span className="shrink-0 text-3xl font-semibold text-muted-foreground" aria-hidden>
-          $
+          {currency === "USD" ? "US$" : "$"}
         </span>
         <span className="inline-grid min-w-0 text-4xl font-semibold tabular-nums">
           <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">
@@ -212,14 +214,14 @@ export function ExpenseForm({ space, members, me, onDone }: ExpenseProps) {
         toast.error(res.error);
         return;
       }
-      toast.success(`Registraste ${money(Math.round(value * 100))}`);
+      toast.success(`Registraste ${money(Math.round(value * 100), space.currency)}`);
       onDone();
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <AmountField id="expense-amount" value={amount} onChange={setAmount} />
+      <AmountField id="expense-amount" value={amount} onChange={setAmount} currency={space.currency} />
 
       <Segmented
         label="Pagó"
@@ -257,6 +259,7 @@ export function ExpenseForm({ space, members, me, onDone }: ExpenseProps) {
 
 type SettlementProps = {
   spaceId: string;
+  currency: Currency;
   members: SharedMember[];
   me: string;
   /** Saldo de quien consulta en centavos: sugiere quién le pasa a quién y cuánto */
@@ -265,7 +268,7 @@ type SettlementProps = {
 };
 
 /** Registra un pago entre participantes para equilibrar el balance. */
-export function SettlementForm({ spaceId, members, me, myNet, onDone }: SettlementProps) {
+export function SettlementForm({ spaceId, currency, members, me, myNet, onDone }: SettlementProps) {
   const other = members.find((m) => m.uid !== me)?.uid ?? me;
   // Si puse de menos (saldo negativo) soy quien paga; si puse de más, me pagan.
   const [from, setFrom] = useState(myNet > 0 ? other : me);
@@ -299,7 +302,7 @@ export function SettlementForm({ spaceId, members, me, myNet, onDone }: Settleme
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <AmountField id="settlement-amount" value={amount} onChange={setAmount} />
+      <AmountField id="settlement-amount" value={amount} onChange={setAmount} currency={currency} />
       <Segmented label="De" value={from} onChange={setFrom} options={options} />
       <Segmented label="A" value={to} onChange={setTo} options={options} />
       <DateNoteFields date={date} setDate={setDate} note={note} setNote={setNote} />
@@ -338,7 +341,7 @@ export function ContributionForm({ space, members, me, saved, onDone }: Contribu
       return;
     }
     if (kind === "withdrawal" && Math.round(value * 100) > saved) {
-      toast.error(`Solo hay ${money(saved)} reservados`);
+      toast.error(`Solo hay ${money(saved, space.currency)} reservados`);
       return;
     }
     startTransition(async () => {
@@ -355,7 +358,7 @@ export function ContributionForm({ space, members, me, saved, onDone }: Contribu
         toast.error(res.error);
         return;
       }
-      toast.success(kind === "deposit" ? `Aportaste ${money(Math.round(value * 100))}` : "Retiro registrado");
+      toast.success(kind === "deposit" ? `Aportaste ${money(Math.round(value * 100), space.currency)}` : "Retiro registrado");
       onDone();
     });
   }
@@ -371,7 +374,7 @@ export function ContributionForm({ space, members, me, saved, onDone }: Contribu
           { value: "withdrawal", label: "Retirar" },
         ]}
       />
-      <AmountField id="contribution-amount" value={amount} onChange={setAmount} />
+      <AmountField id="contribution-amount" value={amount} onChange={setAmount} currency={space.currency} />
       {members.length > 1 && (
         <Segmented
           label={kind === "deposit" ? "Aportó" : "Retiró"}

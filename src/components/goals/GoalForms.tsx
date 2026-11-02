@@ -15,7 +15,7 @@ import {
 import { addGoalMovement, deleteGoal, saveGoal } from "@/lib/actions/goals";
 import { COLOR_KEYS, type ColorKey, type IconKey } from "@/lib/finance/catalog";
 import { formatAmountInput, formatMoney, parseAmount, todayKey } from "@/lib/finance/format";
-import type { Goal } from "@/lib/finance/types";
+import type { Currency, Goal } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 /** Íconos que tienen sentido para una meta (subconjunto del catálogo). */
@@ -48,6 +48,9 @@ export function GoalForm({ goal, preset, onDone }: GoalFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
   const [target, setTarget] = useState(goal ? amountText(goal.target) : "");
   const [targetDate, setTargetDate] = useState(goal?.targetDate ?? "");
+  const [currency, setCurrency] = useState<Currency>(goal?.currency ?? "ARS");
+  // Con dinero reservado la moneda queda fija (los aportes ya están en esa moneda).
+  const currencyLocked = !!goal && goal.saved !== 0;
   const [icon, setIcon] = useState<IconKey>(initial?.icon ?? "piggy-bank");
   const [color, setColor] = useState<ColorKey>(initial?.color ?? "emerald");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -61,7 +64,7 @@ export function GoalForm({ goal, preset, onDone }: GoalFormProps) {
       return;
     }
     startTransition(async () => {
-      const res = await saveGoal({ name, target: amount, targetDate: targetDate || null, icon, color }, goal?.id);
+      const res = await saveGoal({ name, target: amount, currency, targetDate: targetDate || null, icon, color }, goal?.id);
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -109,10 +112,30 @@ export function GoalForm({ goal, preset, onDone }: GoalFormProps) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="goal-target">¿Cuánto quieres juntar?</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="goal-target">¿Cuánto quieres juntar?</Label>
+            <div role="radiogroup" aria-label="Moneda de la meta" className="inline-grid grid-cols-2 rounded-full bg-muted p-0.5 text-xs">
+              {(["ARS", "USD"] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={currency === c}
+                  onClick={() => setCurrency(c)}
+                  disabled={currencyLocked}
+                  className={cn(
+                    "h-6 rounded-full px-2.5 font-medium transition disabled:opacity-60",
+                    currency === c ? "bg-background shadow-sm" : "text-muted-foreground",
+                  )}
+                >
+                  {c === "ARS" ? "Pesos" : "Dólares"}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="relative">
             <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground">
-              $
+              {currency === "USD" ? "US$" : "$"}
             </span>
             <Input
               id="goal-target"
@@ -121,7 +144,7 @@ export function GoalForm({ goal, preset, onDone }: GoalFormProps) {
               value={target}
               onChange={(e) => setTarget(formatAmountInput(e.target.value))}
               placeholder="0"
-              className="h-11 pl-7 text-base tabular-nums"
+              className={cn("h-11 text-base tabular-nums", currency === "USD" ? "pl-11" : "pl-7")}
               required
             />
           </div>
@@ -241,7 +264,7 @@ export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFo
       return;
     }
     if (!deposit && value > goal.saved) {
-      toast.error(`Solo hay ${formatMoney(goal.saved)} reservados en esta meta`);
+      toast.error(`Solo hay ${formatMoney(goal.saved, goal.currency)} reservados en esta meta`);
       return;
     }
     startTransition(async () => {
@@ -250,7 +273,7 @@ export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFo
         toast.error(res.error);
         return;
       }
-      toast.success(deposit ? `Apartaste ${formatMoney(value)} para ${goal.name}` : "Retiro registrado");
+      toast.success(deposit ? `Apartaste ${formatMoney(value, goal.currency)} para ${goal.name}` : "Retiro registrado");
       onDone();
     });
   }
@@ -281,7 +304,7 @@ export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFo
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{goal.name}</p>
           <p className="text-xs text-muted-foreground tabular-nums">
-            Reservado: {formatMoney(goal.saved)} de {formatMoney(goal.target)}
+            Reservado: {formatMoney(goal.saved, goal.currency)} de {formatMoney(goal.target, goal.currency)}
           </p>
         </div>
       </div>
@@ -292,7 +315,8 @@ export function GoalMovementForm({ goal, kind: initialKind, onDone }: MovementFo
         </Label>
         <div className="mt-1 flex cursor-text items-baseline justify-center gap-1 py-2" onClick={focusAmount}>
           <span className="shrink-0 text-3xl font-semibold text-muted-foreground" aria-hidden>
-            {deposit ? "+" : "−"}$
+            {deposit ? "+" : "−"}
+            {goal.currency === "USD" ? "US$" : "$"}
           </span>
           <span className="inline-grid min-w-0 text-4xl font-semibold tabular-nums">
             <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre">

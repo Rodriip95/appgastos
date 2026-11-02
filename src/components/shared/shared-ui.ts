@@ -1,6 +1,6 @@
 import { formatMoney } from "@/lib/finance/format";
 import { fromCents } from "@/lib/finance/shared";
-import type { SharedMember } from "@/lib/finance/types";
+import type { Currency, SharedMember } from "@/lib/finance/types";
 
 /** Color de cada participante en barras y puntos (según su orden en el espacio). */
 export const PERSON_TONES = [
@@ -12,12 +12,13 @@ export const PERSON_TONES = [
 
 export const toneAt = (index: number) => PERSON_TONES[index % PERSON_TONES.length];
 
-export const money = (cents: number) => formatMoney(fromCents(cents));
+/** Monto en centavos en la moneda del espacio. */
+export const money = (cents: number, currency: Currency = "ARS") => formatMoney(fromCents(cents), currency);
 
-/** "+$ 1.500" / "−$ 1.500"; cero sin signo. */
-export function signedMoney(cents: number) {
-  if (cents === 0) return money(0);
-  return `${cents > 0 ? "+" : "−"}${money(Math.abs(cents))}`;
+/** "+$ 1.500" / "−US$ 20"; cero sin signo. */
+export function signedMoney(cents: number, currency: Currency = "ARS") {
+  if (cents === 0) return money(0, currency);
+  return `${cents > 0 ? "+" : "−"}${money(Math.abs(cents), currency)}`;
 }
 
 export const firstName = (m: Pick<SharedMember, "name" | "email">) =>

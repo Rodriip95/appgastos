@@ -85,9 +85,9 @@ export function GoalListView({ spaces, invites, contacts, categories }: Props) {
                   </div>
                 </div>
                 <div className="mt-4 flex items-baseline justify-between gap-2">
-                  <p className="text-2xl font-semibold tracking-tight tabular-nums">{money(total)}</p>
+                  <p className="text-2xl font-semibold tracking-tight tabular-nums">{money(total, space.currency)}</p>
                   <p className="text-sm text-muted-foreground tabular-nums">
-                    de {money(target)} · <span className="font-medium text-foreground">{Math.floor(pct)}%</span>
+                    de {money(target, space.currency)} · <span className="font-medium text-foreground">{Math.floor(pct)}%</span>
                   </p>
                 </div>
                 <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
@@ -96,7 +96,7 @@ export function GoalListView({ spaces, invites, contacts, categories }: Props) {
                     style={{ width: `${Math.max(pct, 1.5)}%` }}
                   />
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground tabular-nums">Tú: {money(mine)}</p>
+                <p className="mt-2 text-xs text-muted-foreground tabular-nums">Tú: {money(mine, space.currency)}</p>
               </Link>
             );
           })}

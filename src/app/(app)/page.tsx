@@ -9,7 +9,7 @@ import { getCards } from "@/lib/data/cards";
 import { getPaidStatements } from "@/lib/data/card-payments";
 import { getCategories } from "@/lib/data/categories";
 import { getGoals, getMonthGoalMovements, getRangeGoalMovements } from "@/lib/data/goals";
-import { getUsdRate } from "@/lib/data/fx";
+import { getUsdRate, getUsdReference } from "@/lib/data/fx";
 import { getSharedMonthSummary, getSharedRangeSummary } from "@/lib/data/shared-links";
 import {
   getFirstActivityMonth,
@@ -78,7 +78,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     getSharedMonthSummary(shiftMonth(month, -1)),
     getRange(view, today),
     getNearOrders(today),
-    getUsdRate(),
+    getUsdReference().then(getUsdRate),
     getPaidStatements(),
   ]);
   // Movimientos en dólares sin cotización guardada (la API no respondió al cargarlos): se usa la de hoy.

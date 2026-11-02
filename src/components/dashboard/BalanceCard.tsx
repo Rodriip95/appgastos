@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowDownLeft, ArrowUpRight, DollarSign, PiggyBank, TrendingDown, TrendingUp } from "lucide-react";
-import { rateLabel, type UsdRate } from "@/lib/finance/currency";
+import { UsdReferencePicker } from "@/components/dashboard/UsdReferencePicker";
+import type { CurrencyTotals, UsdRate } from "@/lib/finance/currency";
 import { formatMoney, formatMonthShort } from "@/lib/finance/format";
 import { changePct, type MonthSummary } from "@/lib/finance/summary";
 import { cn } from "@/lib/utils";
@@ -13,8 +14,8 @@ type Props = {
   previous?: { income: number; expense: number; month: string };
   /** Gasto proyectado a fin de mes (solo mes en curso) */
   projection?: number | null;
-  /** Neto apartado para metas en lo que se ve (aportes − retiros) */
-  saved?: number;
+  /** Neto apartado para metas en lo que se ve (aportes − retiros), por moneda */
+  saved?: CurrencyTotals;
   /** Cotización de hoy, para la referencia del total en pesos */
   usdRate?: UsdRate | null;
   /** Botón para registrar un ingreso (va en el total de ingresos) */
@@ -31,7 +32,7 @@ export function BalanceCard({
   summary,
   previous,
   projection,
-  saved = 0,
+  saved: savedBy = { ars: 0, usd: 0 },
   usdRate,
   incomeAction,
   expenseAction,
@@ -39,7 +40,9 @@ export function BalanceCard({
   // Los totales grandes son los pesos; los dólares van aparte (no se mezclan monedas).
   // El porcentaje gastado sí usa todo junto en pesos, porque es una proporción.
   const { income, expense, balance } = summary.ars;
-  const usd = summary.usd;
+  const saved = savedBy.ars;
+  // El bloque en dólares aparece si hubo movimientos o aportes a metas en dólares.
+  const usd = summary.usd ?? (savedBy.usd !== 0 ? { income: 0, expense: 0, balance: 0 } : null);
   const spentPct = summary.income > 0 ? Math.round((summary.expense / summary.income) * 100) : null;
   const prevLabel = previous ? formatMonthShort(previous.month).toLowerCase() : "";
 
@@ -112,13 +115,26 @@ export function BalanceCard({
           <p className="mt-1 text-xs text-primary-foreground/70 tabular-nums">
             Ingresos {formatMoney(usd.income, "USD")} · Gastos {formatMoney(usd.expense, "USD")}
           </p>
-          <p className="mt-2 border-t border-primary-foreground/15 pt-2 text-xs text-primary-foreground/70">
-            Todo en pesos ≈{" "}
-            <strong className="font-semibold text-primary-foreground tabular-nums">
-              {formatMoney(Math.round(summary.balance))}
-            </strong>
-            {usdRate && ` · Hoy ${rateLabel(usdRate.kind)} ${formatMoney(Math.round(usdRate.rate))}`}
-          </p>
+          {savedBy.usd !== 0 && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-primary-foreground/70 tabular-nums">
+              <PiggyBank className="size-3.5 shrink-0" />
+              {savedBy.usd > 0 ? "Apartaste" : "Retiraste"} {formatMoney(Math.abs(savedBy.usd), "USD")} · Libre{" "}
+              {formatMoney(Math.round((usd.balance - savedBy.usd) * 100) / 100, "USD")}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-primary-foreground/15 pt-2 text-xs text-primary-foreground/70">
+            <span>
+              Todo en pesos ≈{" "}
+              <strong className="font-semibold text-primary-foreground tabular-nums">
+                {formatMoney(Math.round(summary.balance))}
+              </strong>
+            </span>
+            {usdRate && (
+              <span className="flex items-center gap-1">
+                · Hoy <UsdReferencePicker value={usdRate.kind} /> {formatMoney(Math.round(usdRate.rate))}
+              </span>
+            )}
+          </div>
         </div>
       )}
 

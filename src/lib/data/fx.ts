@@ -1,6 +1,8 @@
 import "server-only";
 import { cacheLife } from "next/cache";
-import { USD_REFERENCE } from "@/lib/config";
+import { USD_REFERENCE, USD_REFERENCE_OPTIONS } from "@/lib/config";
+import { verifySession } from "@/lib/auth/session";
+import { profilesCollection } from "@/lib/data/collections";
 import type { UsdRate } from "@/lib/finance/currency";
 import { todayKey } from "@/lib/finance/format";
 
@@ -52,6 +54,22 @@ async function fetchOn(kind: Kind, date: string): Promise<UsdRate> {
   const rate = validRate(row?.venta);
   if (!rate) throw new Error(`argentinadatos sin cotización ${kind} para ${date}`);
   return { kind, rate, date };
+}
+
+export type UsdReference = (typeof USD_REFERENCE_OPTIONS)[number];
+
+export const isUsdReference = (v: unknown): v is UsdReference =>
+  typeof v === "string" && (USD_REFERENCE_OPTIONS as readonly string[]).includes(v);
+
+/** Dólar de referencia que eligió la persona (en su perfil, `usdReference`); oficial si no eligió. */
+export async function getUsdReference(): Promise<UsdReference> {
+  const { uid } = await verifySession();
+  try {
+    const value = (await profilesCollection().doc(uid).get()).get("usdReference");
+    return isUsdReference(value) ? value : (USD_REFERENCE as UsdReference);
+  } catch {
+    return USD_REFERENCE as UsdReference;
+  }
 }
 
 /** Cotización actual del dólar `kind`; null si la API no responde. */

@@ -108,6 +108,7 @@ export function AddSettlementButton({ space, members, me, myNet }: EntryButtonPr
       >
         <SettlementForm
           spaceId={space.id}
+          currency={space.currency}
           members={members}
           me={me}
           myNet={myNet}

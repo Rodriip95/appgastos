@@ -1,7 +1,7 @@
 import { PersonAvatar } from "@/components/contacts/PersonAvatar";
 import { money, signedMoney, toneAt, firstName } from "@/components/shared/shared-ui";
 import type { Balance } from "@/lib/finance/shared";
-import type { SharedMember } from "@/lib/finance/types";
+import type { Currency, SharedMember } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -9,6 +9,8 @@ type Props = {
   members: SharedMember[];
   balance: Balance;
   me: string;
+  /** Moneda del espacio */
+  currency: Currency;
 };
 
 /**
@@ -16,7 +18,7 @@ type Props = {
  * corre hacia quien pagó menos (al centro cuando están parejos) y, debajo, lo que
  * pagó y el saldo de cada uno. Solo números.
  */
-export function BalanceLine({ members, balance, me }: Props) {
+export function BalanceLine({ members, balance, me, currency }: Props) {
   const pair = members.length === 2 ? members : null;
   const netLeft = pair ? (balance.people[pair[0].uid]?.net ?? 0) : 0;
   // −1…1: positivo = la persona de la izquierda puso de más, el indicador va a la derecha.
@@ -26,7 +28,7 @@ export function BalanceLine({ members, balance, me }: Props) {
   return (
     <section aria-label="Balance" className="rounded-3xl border bg-card p-5">
       <p className="text-xs text-muted-foreground">Total</p>
-      <p className="mt-0.5 text-4xl font-semibold tracking-tight tabular-nums">{money(balance.total)}</p>
+      <p className="mt-0.5 text-4xl font-semibold tracking-tight tabular-nums">{money(balance.total, currency)}</p>
 
       {pair && (
         <div className="mt-5 flex items-center gap-3" aria-hidden>
@@ -60,8 +62,8 @@ export function BalanceLine({ members, balance, me }: Props) {
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 {m.uid === me ? "Tú" : firstName(m)}
               </span>
-              <span className="w-24 text-right text-sm tabular-nums">{money(p.paid)}</span>
-              <span className="w-24 text-right text-sm font-semibold tabular-nums">{signedMoney(p.net)}</span>
+              <span className="w-24 text-right text-sm tabular-nums">{money(p.paid, currency)}</span>
+              <span className="w-24 text-right text-sm font-semibold tabular-nums">{signedMoney(p.net, currency)}</span>
             </li>
           );
         })}

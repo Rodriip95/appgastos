@@ -5,6 +5,8 @@ import { CreditCard as CreditCardIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_COLORS } from "@/components/categories/CategoryIcon";
 import { EditCardButton, NewCardButton } from "@/components/cards/CardSheets";
+import { ImportStatementButton } from "@/components/cards/StatementImport";
+import { getCategories } from "@/lib/data/categories";
 import { getCards } from "@/lib/data/cards";
 import { getUpcomingCardTransactions } from "@/lib/data/transactions";
 import {
@@ -18,6 +20,9 @@ import type { CreditCard, Transaction } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Tarjetas · Bingo" };
+
+// Leer un resumen con IA puede tardar más que el límite por defecto de las Server Actions.
+export const maxDuration = 60;
 
 /** Meses de resúmenes futuros que se muestran por tarjeta. */
 const MONTHS_AHEAD = 6;
@@ -44,21 +49,30 @@ export default function CardsPage() {
 async function CardsContent() {
   await io(); // "hoy" se calcula en cada request
   const today = todayKey();
-  const [cards, upcoming] = await Promise.all([
+  const [cards, upcoming, categories] = await Promise.all([
     getCards(),
     getUpcomingCardTransactions(today.slice(0, 7)),
+    getCategories(),
   ]);
 
   if (cards.length === 0) return <EmptyCards />;
 
   return (
-    <ul className="grid gap-4 md:grid-cols-2">
-      {cards.map((card) => (
-        <li key={card.id}>
-          <CardSummary card={card} upcoming={upcoming} today={today} />
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-dashed p-4">
+        <p className="text-sm text-muted-foreground">
+          ¿Te llegó el resumen? Súbelo y Bingo carga los consumos y las cuotas por ti.
+        </p>
+        <ImportStatementButton cards={cards} categories={categories} />
+      </div>
+      <ul className="grid gap-4 md:grid-cols-2">
+        {cards.map((card) => (
+          <li key={card.id}>
+            <CardSummary card={card} upcoming={upcoming} today={today} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

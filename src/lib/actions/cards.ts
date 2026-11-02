@@ -7,6 +7,8 @@ import { z } from "zod";
 import { verifySession } from "@/lib/auth/session";
 import { toCard } from "@/lib/data/cards";
 import { DOC_ID_RE, userCollection } from "@/lib/data/collections";
+import { getUsdRate } from "@/lib/data/fx";
+import { USD_CARD_REFERENCE } from "@/lib/config";
 import { installmentSchedule } from "@/lib/finance/cards";
 import { COLOR_KEYS } from "@/lib/finance/catalog";
 import type { ActionResult } from "@/lib/finance/types";
@@ -29,6 +31,7 @@ const purchaseSchema = z.object({
     .number("Ingresa un monto válido")
     .positive("El monto debe ser mayor a 0")
     .max(1e12, "Monto demasiado grande"),
+  currency: z.enum(["ARS", "USD"]).default("ARS"),
   installments: z.number().int().min(1, "Mínimo 1 cuota").max(48, "Máximo 48 cuotas"),
   date: z.iso.date("Fecha inválida"),
   categoryId: z.string().regex(DOC_ID_RE).nullable(),
@@ -118,6 +121,8 @@ export async function createCardPurchase(
     if (!category.ok) return category;
 
     const schedule = installmentSchedule(toCard(cardDoc), p.date, p.amount, p.installments);
+    // Una compra en dólares con tarjeta, pagada en pesos, sale al dólar tarjeta.
+    const arsRate = p.currency === "USD" ? ((await getUsdRate(USD_CARD_REFERENCE))?.rate ?? null) : null;
     firstMonth = schedule[0].month;
     const purchaseId = randomUUID();
     const col = userCollection(uid, "transactions");
@@ -126,6 +131,8 @@ export async function createCardPurchase(
       batch.set(col.doc(), {
         type: "expense",
         amount: cuota.amount,
+        currency: p.currency,
+        arsRate,
         date: cuota.date,
         month: cuota.month,
         categoryId: p.categoryId,

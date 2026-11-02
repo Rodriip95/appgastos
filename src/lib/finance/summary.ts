@@ -1,3 +1,4 @@
+import { toArs } from "@/lib/finance/currency";
 import type { Category, Transaction, TxType } from "@/lib/finance/types";
 
 export type BreakdownRow = {
@@ -11,10 +12,16 @@ export type BreakdownRow = {
   subs: { key: string; name: string; total: number }[];
 };
 
-export type MonthSummary = {
-  income: number;
-  expense: number;
-  balance: number;
+export type Totals = { income: number; expense: number; balance: number };
+
+/**
+ * Totales de un conjunto de movimientos. `income`/`expense`/`balance` y el desglose están
+ * en pesos, con los dólares sumados por su equivalente (cotización guardada en cada uno).
+ * `ars` y `usd` separan lo que efectivamente fue en cada moneda; `usd` es null si no hubo dólares.
+ */
+export type MonthSummary = Totals & {
+  ars: Totals;
+  usd: Totals | null;
   breakdown: Record<TxType, BreakdownRow[]>;
 };
 
@@ -27,22 +34,27 @@ export function summarizeMonth(
 ): MonthSummary {
   const byId = new Map(categories.map((c) => [c.id, c]));
   const totals: Record<TxType, number> = { income: 0, expense: 0 };
+  const byCurrency = { ARS: { income: 0, expense: 0 }, USD: { income: 0, expense: 0 } };
+  let hasUsd = false;
   const groups: Record<TxType, Map<string, BreakdownRow>> = { income: new Map(), expense: new Map() };
 
   for (const tx of transactions) {
-    totals[tx.type] += tx.amount;
+    const value = toArs(tx);
+    totals[tx.type] += value;
+    byCurrency[tx.currency][tx.type] += tx.amount;
+    if (tx.currency === "USD") hasUsd = true;
 
     const category = (tx.categoryId && byId.get(tx.categoryId)) || null;
     const key = category?.id ?? "none";
     const row = groups[tx.type].get(key) ?? { key, category, total: 0, pct: 0, prevTotal: 0, subs: [] };
-    row.total += tx.amount;
+    row.total += value;
 
     const subName =
       category?.subcategories.find((s) => s.id === tx.subcategoryId)?.name ?? "Sin subcategoría";
     const subKey = tx.subcategoryId ?? "none";
     const sub = row.subs.find((s) => s.key === subKey);
-    if (sub) sub.total += tx.amount;
-    else row.subs.push({ key: subKey, name: subName, total: tx.amount });
+    if (sub) sub.total += value;
+    else row.subs.push({ key: subKey, name: subName, total: value });
 
     groups[tx.type].set(key, row);
   }
@@ -50,7 +62,7 @@ export function summarizeMonth(
   const prevByKey = new Map<string, number>();
   for (const tx of prevTransactions) {
     const key = `${tx.type}:${(tx.categoryId && byId.has(tx.categoryId) && tx.categoryId) || "none"}`;
-    prevByKey.set(key, (prevByKey.get(key) ?? 0) + tx.amount);
+    prevByKey.set(key, (prevByKey.get(key) ?? 0) + toArs(tx));
   }
 
   const toRows = (type: TxType) =>
@@ -64,10 +76,16 @@ export function summarizeMonth(
       }))
       .sort((a, b) => b.total - a.total);
 
+  const toTotals = (t: Record<TxType, number>): Totals => ({
+    income: round2(t.income),
+    expense: round2(t.expense),
+    balance: round2(t.income - t.expense),
+  });
+
   return {
-    income: round2(totals.income),
-    expense: round2(totals.expense),
-    balance: round2(totals.income - totals.expense),
+    ...toTotals(totals),
+    ars: toTotals(byCurrency.ARS),
+    usd: hasUsd ? toTotals(byCurrency.USD) : null,
     breakdown: { income: toRows("income"), expense: toRows("expense") },
   };
 }

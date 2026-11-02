@@ -33,14 +33,14 @@ import {
   formatShortDate,
   parseAmount,
 } from "@/lib/finance/format";
-import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
+import type { Category, CreditCard, Currency, Transaction, TxType } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
 /** Valores iniciales para un alta (repetir un movimiento o registrar un fijo). */
 export type TransactionPrefill = Pick<
   Transaction,
   "type" | "amount" | "categoryId" | "subcategoryId" | "note" | "recurring"
->;
+> & { currency?: Currency };
 
 type Props = {
   categories: Category[];
@@ -78,6 +78,7 @@ export function TransactionForm({
   const initial = transaction ?? prefill;
   const [type, setType] = useState<TxType>(initial?.type ?? defaultType);
   const [amountText, setAmountText] = useState(initial ? amountToText(initial.amount) : "");
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "ARS");
   const [categoryId, setCategoryId] = useState<string | null>(initial?.categoryId ?? null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(initial?.subcategoryId ?? null);
   const [date, setDate] = useState(transaction?.date ?? defaultDate);
@@ -153,6 +154,7 @@ export function TransactionForm({
         const res = await createCardPurchase({
           cardId: card.id,
           amount,
+          currency,
           installments,
           date,
           categoryId,
@@ -178,7 +180,7 @@ export function TransactionForm({
     }
 
     startTransition(async () => {
-      const input = { type, amount, date, categoryId, subcategoryId, note, recurring };
+      const input = { type, amount, currency, date, categoryId, subcategoryId, note, recurring };
       const res = transaction
         ? await updateTransaction(transaction.id, input)
         : await createTransaction(input);
@@ -256,7 +258,8 @@ export function TransactionForm({
             className={cn("shrink-0 text-3xl font-semibold", isIncome ? "text-emerald-600" : "text-rose-600")}
             aria-hidden
           >
-            {isIncome ? "+" : "−"}$
+            {isIncome ? "+" : "−"}
+            {currency === "USD" ? "US$" : "$"}
           </span>
           {/* El texto invisible da el ancho exacto: signo y número quedan centrados juntos. */}
           <span className="inline-grid min-w-0 text-4xl font-semibold tabular-nums">
@@ -282,6 +285,33 @@ export function TransactionForm({
           </span>
         </div>
         {amountError && <p className="mt-1 text-sm text-destructive">Ingresa un monto mayor a 0</p>}
+        <div
+          role="radiogroup"
+          aria-label="Moneda"
+          className="mx-auto mt-1 inline-grid grid-cols-2 rounded-full bg-muted p-0.5 text-xs"
+        >
+          {(["ARS", "USD"] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="radio"
+              aria-checked={currency === c}
+              onClick={() => setCurrency(c)}
+              disabled={!!purchaseId}
+              className={cn(
+                "h-7 rounded-full px-3 font-medium transition",
+                currency === c ? "bg-background shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              {c === "ARS" ? "Pesos" : "Dólares"}
+            </button>
+          ))}
+        </div>
+        {currency === "USD" && !purchaseId && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Queda en tu balance en dólares, con su equivalente en pesos a la cotización del día.
+          </p>
+        )}
       </div>
 
       {/* Pago con tarjeta */}
@@ -345,7 +375,7 @@ export function TransactionForm({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {schedule
-                    ? `${installments === 1 ? "Un pago" : `${installments} cuotas`} de ${formatMoney(schedule[0].amount)}. ${
+                    ? `${installments === 1 ? "Un pago" : `${installments} cuotas`} de ${formatMoney(schedule[0].amount, currency)}. ${
                         installments === 1 ? "Vence" : "La primera vence"
                       } el ${formatShortDate(schedule[0].date)} (cierre día ${card.closingDay}).`
                     : "Ingresa el monto total de la compra para ver las cuotas."}

@@ -17,6 +17,7 @@ import { BALANCE_ACTIONS_ID } from "@/components/dashboard/BalanceCard";
 import { CategoryIcon } from "@/components/categories/CategoryIcon";
 import { TransactionForm, type TransactionPrefill } from "@/components/transactions/TransactionForm";
 import { deleteTransaction } from "@/lib/actions/transactions";
+import { toArs } from "@/lib/finance/currency";
 import { formatMoney, todayKey } from "@/lib/finance/format";
 import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,7 @@ export function TransactionSheetProvider({
               prefill: {
                 type: tx.type,
                 amount: tx.amount,
+                currency: tx.currency,
                 categoryId: tx.categoryId,
                 subcategoryId: tx.subcategoryId,
                 note: tx.note,
@@ -207,7 +209,7 @@ export function RecurringSuggestions({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{t.note || c?.name || "Movimiento fijo"}</p>
                 <p className="text-xs text-muted-foreground tabular-nums">
-                  {formatMoney(t.amount)} el mes pasado
+                  {formatMoney(t.amount, t.currency)} el mes pasado
                 </p>
               </div>
               <button
@@ -216,6 +218,7 @@ export function RecurringSuggestions({
                   openNew(t.type, {
                     type: t.type,
                     amount: t.amount,
+                    currency: t.currency,
                     categoryId: t.categoryId,
                     subcategoryId: t.subcategoryId,
                     note: t.note,
@@ -354,7 +357,12 @@ export function TransactionRow({
           )}
         >
           {income ? "+" : "−"}
-          {formatMoney(transaction.amount)}
+          {formatMoney(transaction.amount, transaction.currency)}
+          {transaction.currency === "USD" && transaction.arsRate && (
+            <span className="block text-right text-[11px] font-normal text-muted-foreground">
+              ≈ {formatMoney(Math.round(toArs(transaction)))}
+            </span>
+          )}
         </span>
       </button>
     </div>

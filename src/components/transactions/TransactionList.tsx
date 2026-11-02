@@ -124,14 +124,25 @@ export function TransactionList({
         </div>
       ) : (
         [...days].slice(0, searching ? undefined : dayLimit).map(([date, items]) => {
-          const net = items.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0);
+          // Neto del día por moneda: pesos y dólares no se suman entre sí.
+          const netOf = (currency: Transaction["currency"]) =>
+            Math.round(
+              items
+                .filter((t) => t.currency === currency)
+                .reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0) * 100,
+            ) / 100;
+          const net = netOf("ARS");
+          const netUsd = netOf("USD");
+          const hasUsd = items.some((t) => t.currency === "USD");
+          const hasArs = items.some((t) => t.currency !== "USD");
+          const signed = (n: number, currency: Transaction["currency"]) =>
+            `${n > 0 ? "+" : n < 0 ? "−" : ""}${formatMoney(Math.abs(n), currency)}`;
           return (
             <div key={date} className="space-y-1.5">
               <div className="flex items-baseline justify-between px-1 text-xs font-medium text-muted-foreground">
                 <span>{formatDayLabel(date, today)}</span>
                 <span className="tabular-nums">
-                  {net > 0 ? "+" : net < 0 ? "−" : ""}
-                  {formatMoney(Math.abs(Math.round(net * 100) / 100))}
+                  {[hasArs && signed(net, "ARS"), hasUsd && signed(netUsd, "USD")].filter(Boolean).join(" · ")}
                 </span>
               </div>
               <ul className="divide-y overflow-hidden rounded-2xl border bg-card">

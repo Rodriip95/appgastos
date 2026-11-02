@@ -1,5 +1,6 @@
+import { sumByCurrency, type CurrencyTotals } from "@/lib/finance/currency";
 import { lastDayOfMonth, shiftDay, shiftMonth } from "@/lib/finance/format";
-import type { CreditCard, Transaction } from "@/lib/finance/types";
+import type { CreditCard, Currency, Transaction } from "@/lib/finance/types";
 
 // Lógica pura de tarjetas: en qué resumen cae una compra, cuándo vence cada
 // cuota y qué vencimientos se acercan. Todo con fechas como strings.
@@ -61,14 +62,20 @@ export function daysBetween(from: string, to: string): number {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** Total de la tarjeta en el resumen que vence en `month`. */
-export function statementTotal(cardId: string, month: string, transactions: Transaction[]): number {
-  return round2(
-    transactions.filter((t) => t.cardId === cardId && t.month === month).reduce((s, t) => s + t.amount, 0),
-  );
+/** Total de la tarjeta en el resumen que vence en `month`, en pesos y en dólares (como el resumen del banco). */
+export function statementTotal(cardId: string, month: string, transactions: Transaction[]): CurrencyTotals {
+  return sumByCurrency(transactions.filter((t) => t.cardId === cardId && t.month === month));
 }
 
-export type UpcomingDue = { card: CreditCard; date: string; daysLeft: number; amount: number };
+export type UpcomingDue = {
+  card: CreditCard;
+  date: string;
+  daysLeft: number;
+  /** Total en pesos del resumen */
+  amount: number;
+  /** Total en dólares del resumen */
+  usd: number;
+};
 
 /** Vencimientos de los próximos `withinDays` días, del más cercano al más lejano. */
 export function upcomingDues(
@@ -81,12 +88,8 @@ export function upcomingDues(
   return cards
     .map((card) => {
       const date = nextDueDate(card, today);
-      return {
-        card,
-        date,
-        daysLeft: daysBetween(today, date),
-        amount: statementTotal(card.id, date.slice(0, 7), transactions),
-      };
+      const total = statementTotal(card.id, date.slice(0, 7), transactions);
+      return { card, date, daysLeft: daysBetween(today, date), amount: total.ars, usd: total.usd };
     })
     .filter((d) => d.date <= limit)
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -95,6 +98,7 @@ export function upcomingDues(
 export type CardPurchase = {
   purchaseId: string;
   note: string;
+  currency: Currency;
   installments: number;
   /** Cuotas que vencen desde el mes actual en adelante */
   remaining: number;
@@ -114,6 +118,7 @@ export function activePurchases(cardId: string, upcoming: Transaction[]): CardPu
     return {
       purchaseId,
       note: items[0].note,
+      currency: items[0].currency,
       installments: items[0].installment?.total ?? items.length,
       remaining: items.length,
       perInstallment: items[0].amount,

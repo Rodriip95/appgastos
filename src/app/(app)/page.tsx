@@ -8,6 +8,7 @@ import { getNearOrders } from "@/lib/data/business";
 import { getCards } from "@/lib/data/cards";
 import { getCategories } from "@/lib/data/categories";
 import { getGoals, getMonthGoalMovements, getRangeGoalMovements } from "@/lib/data/goals";
+import { getUsdRate } from "@/lib/data/fx";
 import { getSharedMonthSummary, getSharedRangeSummary } from "@/lib/data/shared-links";
 import {
   getFirstActivityMonth,
@@ -16,6 +17,7 @@ import {
   getRangeTransactions,
   getUpcomingCardTransactions,
 } from "@/lib/data/transactions";
+import { fillRates } from "@/lib/finance/currency";
 import { BALANCE_VIEW_COOKIE, resolveBalanceView, type BalanceView } from "@/lib/finance/balance-view";
 import { isMonthKey, shiftMonth, todayKey } from "@/lib/finance/format";
 import type { Transaction } from "@/lib/finance/types";
@@ -60,6 +62,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     prevShared,
     range,
     nearOrders,
+    usdRate,
   ] = await Promise.all([
     getCategories(),
     getCards(),
@@ -73,15 +76,18 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     getSharedMonthSummary(shiftMonth(month, -1)),
     getRange(view, today),
     getNearOrders(today),
+    getUsdRate(),
   ]);
+  // Movimientos en dólares sin cotización guardada (la API no respondió al cargarlos): se usa la de hoy.
+  const withRate = (list: Transaction[]) => fillRates(list, usdRate?.rate ?? null);
   const goalMovements = [...ownGoalMovements, ...shared.goalMovements];
 
   return (
     <DashboardView
       categories={categories}
       cards={cards}
-      transactions={newestFirst([...transactions, ...shared.transactions])}
-      prevTransactions={[...prevTransactions, ...prevShared.transactions]}
+      transactions={withRate(newestFirst([...transactions, ...shared.transactions]))}
+      prevTransactions={withRate([...prevTransactions, ...prevShared.transactions])}
       upcomingCardTransactions={upcomingCardTransactions}
       firstMonth={firstMonth}
       nearOrders={nearOrders}
@@ -93,7 +99,8 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       today={today}
       filterKey={typeof c === "string" ? c : null}
       view={view}
-      range={range}
+      range={range && { ...range, transactions: withRate(range.transactions) }}
+      usdRate={usdRate}
     />
   );
 }

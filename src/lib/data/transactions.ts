@@ -10,6 +10,8 @@ export function toTransaction(doc: QueryDocumentSnapshot): Transaction {
     id: doc.id,
     type: d.type === "income" ? "income" : "expense",
     amount: Number(d.amount) || 0,
+    currency: d.currency === "USD" ? "USD" : "ARS",
+    arsRate: d.currency === "USD" && Number(d.arsRate) > 0 ? Number(d.arsRate) : null,
     date: d.date,
     month: d.month,
     categoryId: d.categoryId ?? null,

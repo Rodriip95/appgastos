@@ -1,5 +1,6 @@
 import type { Order } from "@/lib/finance/business";
 import type { UpcomingDue } from "@/lib/finance/cards";
+import { formatTotals } from "@/lib/finance/currency";
 import { formatMoney, formatMonth, formatShortDate, shiftDay, shiftMonth } from "@/lib/finance/format";
 import { goalPct, goalRemaining } from "@/lib/finance/goals";
 import { changePct, type MonthSummary } from "@/lib/finance/summary";
@@ -59,7 +60,8 @@ function dueMessage(dues: UpcomingDue[], today: string): Candidate {
   const signature = dues.map((d) => `${d.card.id}:${d.date}`).join("|");
   const when = (d: UpcomingDue) =>
     d.daysLeft === 0 ? "hoy" : d.daysLeft === 1 ? "mañana" : `en ${d.daysLeft} días`;
-  const amountOf = (d: UpcomingDue) => (d.amount > 0 ? ` (${money(d.amount)} en cuotas)` : "");
+  const amountOf = (d: UpcomingDue) =>
+    d.amount > 0 || d.usd > 0 ? ` (${formatTotals({ ars: d.amount, usd: d.usd })} en cuotas)` : "";
   const seed = `${today}:due`;
 
   let text: string;
@@ -91,14 +93,16 @@ function dueMessage(dues: UpcomingDue[], today: string): Candidate {
         seed,
       );
     }
-    if (first.amount === 0) text += " Revisa tu resumen para saber cuánto es.";
+    if (first.amount === 0 && first.usd === 0) text += " Revisa tu resumen para saber cuánto es.";
   } else {
     const list = dues.map((d) => `${d.card.name} ${when(d)}`).join(", ");
-    const total = dues.reduce((sum, d) => sum + d.amount, 0);
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const sum = { ars: r2(dues.reduce((s, d) => s + d.amount, 0)), usd: r2(dues.reduce((s, d) => s + d.usd, 0)) };
+    const total = sum.ars + sum.usd;
     text = pick(
       [
-        `¡Guau! Tienes ${dues.length} vencimientos cerca: ${list}.${total > 0 ? ` En cuotas ya hay ${money(total)} cargados.` : ""}`,
-        `Ojo, ${dues.length} tarjetas por vencer: ${list}.${total > 0 ? ` Suman ${money(total)} en cuotas.` : ""} ¡Vamos de a una!`,
+        `¡Guau! Tienes ${dues.length} vencimientos cerca: ${list}.${total > 0 ? ` En cuotas ya hay ${formatTotals(sum)} cargados.` : ""}`,
+        `Ojo, ${dues.length} tarjetas por vencer: ${list}.${total > 0 ? ` Suman ${formatTotals(sum)} en cuotas.` : ""} ¡Vamos de a una!`,
       ],
       seed,
     );

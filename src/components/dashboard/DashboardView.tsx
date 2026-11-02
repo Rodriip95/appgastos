@@ -24,6 +24,7 @@ import {
   projectMonthExpense,
   summarizeMonth,
 } from "@/lib/finance/summary";
+import type { UsdRate } from "@/lib/finance/currency";
 import type { Category, CreditCard, Goal, GoalMovement, Transaction } from "@/lib/finance/types";
 
 export type DashboardData = {
@@ -54,6 +55,8 @@ type Props = DashboardData & {
   view: BalanceView;
   /** Lo que muestra la vista general o de período; null en la vista mensual */
   range: { transactions: Transaction[]; goalMovements: GoalMovement[] } | null;
+  /** Cotización de hoy del dólar de referencia (null si la API no respondió) */
+  usdRate: UsdRate | null;
 };
 
 /** Vista del mes. Solo presentación: los datos llegan de `(app)/page.tsx`. */
@@ -74,6 +77,7 @@ export function DashboardView({
   filterKey,
   view,
   range,
+  usdRate,
 }: Props) {
   const summary = summarizeMonth(transactions, categories, prevTransactions);
   const prevSummary = summarizeMonth(prevTransactions, categories);
@@ -163,9 +167,10 @@ export function DashboardView({
               summary={shownSummary}
               previous={
                 !range && prevTransactions.length > 0
-                  ? { income: prevSummary.income, expense: prevSummary.expense, month: shiftMonth(month, -1) }
+                  ? { ...prevSummary.ars, month: shiftMonth(month, -1) }
                   : undefined
               }
+              usdRate={usdRate}
               projection={range ? null : projection}
               saved={netSaved(range?.goalMovements ?? goalMovements)}
               incomeAction={<QuickAddButton type="income" />}

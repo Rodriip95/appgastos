@@ -16,6 +16,7 @@ import {
   nextDueDate,
   statementTotal,
 } from "@/lib/finance/cards";
+import { formatTotals } from "@/lib/finance/currency";
 import { formatMoney, formatMonthShort, formatShortDate, shiftMonth, todayKey } from "@/lib/finance/format";
 import type { Category, CreditCard, Transaction } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
@@ -94,7 +95,9 @@ function CardSummary({
     const month = shiftMonth(due.slice(0, 7), i);
     return { month, total: statementTotal(card.id, month, upcoming) };
   });
-  const max = Math.max(...months.map((m) => m.total), 1);
+  // La barra compara los pesos (o los dólares, si la tarjeta solo tiene consumos en dólares).
+  const barCurrency = months.some((m) => m.total.ars > 0) ? "ars" : "usd";
+  const max = Math.max(...months.map((m) => m.total[barCurrency]), 1);
   const purchases = activePurchases(card.id, upcoming);
 
   return (
@@ -129,7 +132,7 @@ function CardSummary({
           Próximo vencimiento: {formatShortDate(due)} (
           {daysLeft === 0 ? "hoy" : daysLeft === 1 ? "mañana" : `en ${daysLeft} días`})
         </p>
-        <p className="mt-0.5 text-2xl font-semibold tabular-nums">{formatMoney(dueAmount)}</p>
+        <p className="mt-0.5 text-2xl font-semibold tabular-nums">{formatTotals(dueAmount)}</p>
       </div>
 
       <div className="space-y-1.5">
@@ -141,10 +144,10 @@ function CardSummary({
               <span className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <span
                   className={cn("block h-full rounded-full", CATEGORY_COLORS[card.color]?.solid)}
-                  style={{ width: `${(total / max) * 100}%` }}
+                  style={{ width: `${(total[barCurrency] / max) * 100}%` }}
                 />
               </span>
-              <span className="text-right font-medium tabular-nums">{formatMoney(total)}</span>
+              <span className="text-right font-medium tabular-nums">{formatTotals(total)}</span>
             </li>
           ))}
         </ul>
@@ -164,11 +167,11 @@ function CardSummary({
                   <p className="truncate font-medium">{p.note || "Compra sin descripción"}</p>
                   <p className="text-xs text-muted-foreground">
                     {p.installments > 1
-                      ? `Quedan ${p.remaining} de ${p.installments} cuotas de ${formatMoney(p.perInstallment)}`
+                      ? `Quedan ${p.remaining} de ${p.installments} cuotas de ${formatMoney(p.perInstallment, p.currency)}`
                       : "Un pago"}
                   </p>
                 </div>
-                <span className="shrink-0 font-semibold tabular-nums">{formatMoney(p.remainingAmount)}</span>
+                <span className="shrink-0 font-semibold tabular-nums">{formatMoney(p.remainingAmount, p.currency)}</span>
               </li>
             ))}
           </ul>

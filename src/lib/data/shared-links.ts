@@ -73,6 +73,8 @@ async function sharedSummary(
             id: `shared:${spaceId}:${doc.id}`,
             type: "expense",
             amount: fromCents(mine),
+            currency: "ARS",
+            arsRate: null,
             date,
             month,
             categoryId: link.categoryId,

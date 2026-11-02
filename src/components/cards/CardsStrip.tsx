@@ -2,7 +2,8 @@ import Link from "next/link";
 import { ChevronRight, CreditCard as CreditCardIcon } from "lucide-react";
 import { CATEGORY_COLORS } from "@/components/categories/CategoryIcon";
 import { activePurchases, daysBetween, nextDueDate, statementTotal } from "@/lib/finance/cards";
-import { formatMoney, formatShortDate } from "@/lib/finance/format";
+import { formatTotals } from "@/lib/finance/currency";
+import { formatShortDate } from "@/lib/finance/format";
 import type { CreditCard, Transaction } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +69,14 @@ export function CardsStrip({ cards, upcoming, today }: Props) {
                   <p className="text-xs text-white/80">
                     Vence {formatShortDate(due)} · {whenLabel(days)}
                   </p>
-                  <p className="text-2xl font-semibold tracking-tight tabular-nums">{formatMoney(amount)}</p>
+                  <p
+                    className={cn(
+                      "truncate font-semibold tracking-tight tabular-nums",
+                      amount.usd > 0 && amount.ars > 0 ? "text-xl" : "text-2xl",
+                    )}
+                  >
+                    {formatTotals(amount)}
+                  </p>
                   <p className="text-xs text-white/70">
                     {purchases === 0
                       ? "Sin cuotas pendientes"

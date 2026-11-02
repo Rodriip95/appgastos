@@ -18,6 +18,8 @@ import {
 import { toCard } from "@/lib/data/cards";
 import { getCategories } from "@/lib/data/categories";
 import { DOC_ID_RE, userCollection } from "@/lib/data/collections";
+import { getUsdRate } from "@/lib/data/fx";
+import { USD_CARD_REFERENCE } from "@/lib/config";
 import { nextDueDate, remainingInstallments } from "@/lib/finance/cards";
 import { COLOR_KEYS } from "@/lib/finance/catalog";
 import { todayKey } from "@/lib/finance/format";
@@ -122,10 +124,12 @@ export async function analyzeStatement(
   const fallbackDate = closingDate ?? `${month}-01`;
 
   // Posibles repetidos: gastos de esta tarjeta ya cargados en el mismo resumen.
-  let loaded: number[] = [];
+  let loaded: { amount: number; currency: string }[] = [];
   if (card) {
     const existing = await userCollection(uid, "transactions").where("month", "==", month).get();
-    loaded = existing.docs.filter((d) => d.get("cardId") === cardId).map((d) => Number(d.get("amount")));
+    loaded = existing.docs
+      .filter((d) => d.get("cardId") === cardId)
+      .map((d) => ({ amount: Number(d.get("amount")), currency: d.get("currency") === "USD" ? "USD" : "ARS" }));
   }
 
   const items: StatementItem[] = extracted.items
@@ -143,7 +147,7 @@ export async function analyzeStatement(
         installment,
         installments,
         ...sanitizeCategory(categories, it.categoryId, it.subcategoryId),
-        duplicate: loaded.some((a) => Math.abs(a - amount) < 0.01),
+        duplicate: loaded.some((l) => l.currency === it.currency && Math.abs(l.amount - amount) < 0.01),
       };
     });
 
@@ -164,6 +168,7 @@ const itemSchema = z
     date: z.iso.date("Fecha inválida"),
     note: z.string().trim().max(120, "Descripción muy larga"),
     amount: z.number("Monto inválido").positive("Los montos deben ser mayores a 0").max(1e12, "Monto demasiado grande"),
+    currency: z.enum(["ARS", "USD"]).default("ARS"),
     installment: z.number().int().min(1, "Cuota inválida"),
     installments: z.number().int().min(1, "Mínimo 1 cuota").max(48, "Máximo 48 cuotas"),
     categoryId: z.string().regex(DOC_ID_RE).nullable(),
@@ -218,6 +223,10 @@ export async function importStatement(input: StatementImportInput): Promise<Acti
       card = toCard(cardDoc);
     }
     const categories = await getCategories();
+    // Los consumos en dólares quedan en dólares; el equivalente en pesos usa el dólar tarjeta.
+    const usdRate = items.some((it) => it.currency === "USD")
+      ? ((await getUsdRate(USD_CARD_REFERENCE))?.rate ?? null)
+      : null;
 
     const col = userCollection(uid, "transactions");
     const docs = items.flatMap((it) => {
@@ -226,6 +235,8 @@ export async function importStatement(input: StatementImportInput): Promise<Acti
       return remainingInstallments(card, month, it.amount, it.installment, it.installments).map((cuota) => ({
         type: "expense",
         amount: cuota.amount,
+        currency: it.currency,
+        arsRate: it.currency === "USD" ? usdRate : null,
         date: cuota.date,
         month: cuota.month,
         ...category,

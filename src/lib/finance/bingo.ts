@@ -1,5 +1,6 @@
+import type { Order } from "@/lib/finance/business";
 import type { UpcomingDue } from "@/lib/finance/cards";
-import { formatMoney, formatMonth, formatShortDate, shiftMonth } from "@/lib/finance/format";
+import { formatMoney, formatMonth, formatShortDate, shiftDay, shiftMonth } from "@/lib/finance/format";
 import { goalPct, goalRemaining } from "@/lib/finance/goals";
 import { changePct, type MonthSummary } from "@/lib/finance/summary";
 import type { Category, Goal, Transaction } from "@/lib/finance/types";
@@ -37,6 +38,8 @@ export type BingoContext = {
   /** Fijos del mes pasado que todavía no se registraron este mes */
   pendingRecurring: Transaction[];
   goals: Goal[];
+  /** Pedidos abiertos con entrega en la próxima semana, los más cercanos primero */
+  deliveries: Order[];
 };
 
 type Candidate = BingoMessage & { priority: number };
@@ -113,6 +116,28 @@ function dueMessage(dues: UpcomingDue[], today: string): Candidate {
   };
 }
 
+function deliveryMessage(deliveries: Order[], today: string): Candidate {
+  const first = deliveries[0];
+  const urgent = first.deliveryDate <= shiftDay(today, 2);
+  const others = deliveries.length - 1;
+  const when =
+    first.deliveryDate < today
+      ? `se te pasó la entrega de ${first.client}`
+      : first.deliveryDate === today
+        ? `hoy entregas el pedido de ${first.client}`
+        : `el ${formatShortDate(first.deliveryDate)} entregas el pedido de ${first.client}`;
+  return {
+    id: `delivery:${deliveries.map((o) => `${o.id}:${o.deliveryDate}`).join("|")}`,
+    priority: urgent ? 1 : 32,
+    tone: urgent ? "alert" : "warn",
+    variant: "hello",
+    text: `¡Guau! Olfateé una entrega: ${when}${others > 0 ? ` (y ${others} más esta semana)` : ""}.`,
+    href: "/emprendimiento",
+    cta: "Ver pedidos",
+    dismissible: true,
+  };
+}
+
 /** Todos los casos que aplican hoy, del más urgente al más tranquilo (máximo `limit`). */
 export function bingoMessages(ctx: BingoContext, limit = 4): BingoMessage[] {
   const { summary, prevSummary, today, month } = ctx;
@@ -123,6 +148,9 @@ export function bingoMessages(ctx: BingoContext, limit = 4): BingoMessage[] {
 
   // --- Vencimientos de tarjetas ---
   if (ctx.dues.length > 0) out.push(dueMessage(ctx.dues, today));
+
+  // --- Entregas del emprendimiento ---
+  if (ctx.deliveries.length > 0) out.push(deliveryMessage(ctx.deliveries, today));
 
   // --- Empezar: sin categorías ---
   if (ctx.categories.length === 0) {

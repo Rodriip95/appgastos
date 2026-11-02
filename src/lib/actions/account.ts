@@ -20,11 +20,15 @@ const PERSONAL = [
   "contacts",
   "sharedLinks",
   "pushTokens",
+  "orders",
+  "orderPayments",
+  "materials",
+  "materialPurchases",
 ] as const;
 
 /**
  * Borra TODA la información de la cuenta para empezar de cero: movimientos, categorías,
- * tarjetas, metas, contactos y vínculos. De los espacios compartidos se sale (lo que cargaste
+ * tarjetas, metas, emprendimiento, contactos y vínculos. De los espacios compartidos se sale (lo que cargaste
  * queda para las demás personas, o se borra el espacio si no queda nadie). La cuenta de
  * Google y el perfil se conservan. Solo funciona con el flag `enable_data_reset` de
  * Remote Config encendido, y se comprueba aquí en el servidor.

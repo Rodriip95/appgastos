@@ -4,6 +4,7 @@ import { io } from "next/cache";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { DashboardView } from "@/components/dashboard/DashboardView";
 import { verifySession } from "@/lib/auth/session";
+import { getNearOrders } from "@/lib/data/business";
 import { getCards } from "@/lib/data/cards";
 import { getCategories } from "@/lib/data/categories";
 import { getGoals, getMonthGoalMovements, getRangeGoalMovements } from "@/lib/data/goals";
@@ -58,6 +59,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     shared,
     prevShared,
     range,
+    nearOrders,
   ] = await Promise.all([
     getCategories(),
     getCards(),
@@ -70,6 +72,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     getSharedMonthSummary(month),
     getSharedMonthSummary(shiftMonth(month, -1)),
     getRange(view, today),
+    getNearOrders(today),
   ]);
   const goalMovements = [...ownGoalMovements, ...shared.goalMovements];
 
@@ -81,6 +84,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       prevTransactions={[...prevTransactions, ...prevShared.transactions]}
       upcomingCardTransactions={upcomingCardTransactions}
       firstMonth={firstMonth}
+      nearOrders={nearOrders}
       futureMonths={futureMonths}
       goals={goals}
       goalMovements={goalMovements}

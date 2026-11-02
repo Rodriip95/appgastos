@@ -28,6 +28,7 @@ const PERSONAL = [
   "materialPurchases",
   "clients",
   "businessExpenses",
+  "services",
   "settings",
 ] as const;
 

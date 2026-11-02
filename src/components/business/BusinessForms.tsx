@@ -14,11 +14,13 @@ import {
   deleteClient,
   deleteMaterial,
   deleteOrder,
+  deleteService,
   saveBusinessExpense,
   saveBusinessSettings,
   saveClient,
   saveMaterial,
   saveOrder,
+  saveService,
 } from "@/lib/actions/business";
 import {
   CONCEPT_LABEL,
@@ -33,7 +35,9 @@ import {
   type ExpenseConcept,
   type Material,
   type Order,
+  type OrderKind,
   type OrderPriority,
+  type Service,
 } from "@/lib/finance/business";
 import { formatAmountInput, formatMoney, parseAmount, todayKey } from "@/lib/finance/format";
 import { cn } from "@/lib/utils";
@@ -105,26 +109,43 @@ function DeleteButton({
 
 export function OrderForm({
   order,
+  kind: newKind = "order",
   materials,
+  services,
   clients,
   targetMargin,
   presetClient,
+  presetDate,
   onDone,
 }: {
   order?: Order;
+  /** Qué se crea (al editar manda el del pedido) */
+  kind?: OrderKind;
   materials: Material[];
+  services: Service[];
   clients: Client[];
   targetMargin: number;
   /** Cliente ya elegido (al crear un pedido desde su ficha) */
   presetClient?: Client;
+  /** Día ya elegido (al crear desde el calendario) */
+  presetDate?: string;
   onDone: () => void;
 }) {
+  const kind = order?.kind ?? newKind;
+  const turn = kind === "appointment";
+  const noun = turn ? "turno" : "pedido";
   const [client, setClient] = useState(order?.client ?? presetClient?.name ?? "");
   const [phone, setPhone] = useState(order?.phone ?? presetClient?.phone ?? "");
   const [detail, setDetail] = useState(order?.detail ?? "");
   const [amount, setAmount] = useState(order ? amountText(order.amount) : "");
   const [priority, setPriority] = useState<OrderPriority>(order?.priority ?? "medium");
-  const [deliveryDate, setDeliveryDate] = useState(order?.deliveryDate ?? "");
+  const [deliveryDate, setDeliveryDate] = useState(order?.deliveryDate ?? presetDate ?? "");
+  const [time, setTime] = useState(order?.time ?? "");
+  const [serviceLines, setServiceLines] = useState(
+    order?.services.map((s) => ({ serviceId: s.serviceId, name: s.name, price: s.price })) ?? [],
+  );
+  // El monto sigue a los servicios hasta que se escribe a mano.
+  const [amountTouched, setAmountTouched] = useState(Boolean(order));
   const [lines, setLines] = useState(
     order?.materials.map((m) => ({ materialId: m.materialId, name: m.name, qty: String(m.qty) })) ?? [],
   );
@@ -132,6 +153,14 @@ export function OrderForm({
   const [pending, startTransition] = useTransition();
 
   const available = materials.filter((m) => !lines.some((l) => l.materialId === m.id));
+  const availableServices = services.filter((sv) => !serviceLines.some((l) => l.serviceId === sv.id));
+  function changeServices(next: typeof serviceLines) {
+    setServiceLines(next);
+    if (!amountTouched) {
+      const total = next.reduce((sum, l) => sum + l.price, 0);
+      setAmount(total > 0 ? amountText(total) : "");
+    }
+  }
   // Si el nombre coincide con un cliente de la libreta, el pedido queda enlazado a ese cliente.
   const matched = clients.find((c) => normalizeName(c.name) === normalizeName(client));
   const priceOf = (materialId: string) =>
@@ -147,11 +176,15 @@ export function OrderForm({
     e.preventDefault();
     const parsedAmount = parseAmount(amount);
     if (!parsedAmount) {
-      toast.error("Ingresa el monto del pedido");
+      toast.error(`Ingresa el monto del ${noun}`);
       return;
     }
     if (!deliveryDate) {
-      toast.error("Elige la fecha de entrega");
+      toast.error(turn ? "Elige el día del turno" : "Elige la fecha de entrega");
+      return;
+    }
+    if (turn && !time) {
+      toast.error("Elige la hora del turno");
       return;
     }
     const parsedLines = lines.map((l) => ({ materialId: l.materialId, qty: parseQty(l.qty) ?? 0 }));
@@ -162,6 +195,9 @@ export function OrderForm({
     startTransition(async () => {
       const res = await saveOrder(
         {
+          kind,
+          time: turn ? time : null,
+          services: turn ? serviceLines.map((l) => l.serviceId) : [],
           clientId: matched?.id ?? null,
           client,
           phone,
@@ -177,7 +213,7 @@ export function OrderForm({
         toast.error(res.error);
         return;
       }
-      toast.success(order ? "Pedido actualizado" : "Pedido agregado");
+      toast.success(order ? `${turn ? "Turno" : "Pedido"} actualizado` : `${turn ? "Turno" : "Pedido"} agregado`);
       onDone();
     });
   }
@@ -194,7 +230,7 @@ export function OrderForm({
         toast.error(res.error);
         return;
       }
-      toast.success("Pedido eliminado");
+      toast.success(`${turn ? "Turno" : "Pedido"} eliminado`);
       onDone();
     });
   }
@@ -242,37 +278,121 @@ export function OrderForm({
         </div>
       </div>
 
+      {turn && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="min-w-0 space-y-1.5">
+            <Label htmlFor="order-date">Día</Label>
+            <Input
+              id="order-date"
+              type="date"
+              value={deliveryDate}
+              onChange={(e) => setDeliveryDate(e.target.value)}
+              className="h-11 min-w-0 appearance-none text-base"
+              required
+            />
+          </div>
+          <div className="min-w-0 space-y-1.5">
+            <Label htmlFor="order-time">Hora</Label>
+            <Input
+              id="order-time"
+              type="time"
+              step={300}
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="h-11 min-w-0 appearance-none text-base"
+              required
+            />
+          </div>
+        </div>
+      )}
+
+      {turn && (
+        <div className="space-y-2">
+          <Label>Servicios</Label>
+          {serviceLines.map((line) => (
+            <div key={line.serviceId} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-sm">{line.name}</span>
+              <span className="text-sm text-muted-foreground tabular-nums">{formatMoney(line.price)}</span>
+              <button
+                type="button"
+                aria-label={`Quitar ${line.name}`}
+                onClick={() => changeServices(serviceLines.filter((l) => l.serviceId !== line.serviceId))}
+                className="grid size-9 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          ))}
+          {availableServices.length > 0 ? (
+            <select
+              aria-label="Agregar servicio"
+              value=""
+              onChange={(e) => {
+                const sv = services.find((x) => x.id === e.target.value);
+                if (sv) changeServices([...serviceLines, { serviceId: sv.id, name: sv.name, price: sv.price }]);
+              }}
+              className="h-11 w-full rounded-lg border bg-transparent px-3 text-sm text-muted-foreground"
+            >
+              <option value="">Agregar servicio…</option>
+              {availableServices.map((sv) => (
+                <option key={sv.id} value={sv.id}>
+                  {sv.name} ({formatMoney(sv.price)}
+                  {sv.duration ? ` · ${sv.duration} min` : ""})
+                </option>
+              ))}
+            </select>
+          ) : (
+            serviceLines.length === 0 && (
+              <p className="text-xs text-muted-foreground">Carga tus servicios (ej. Corte) en la pestaña Stock.</p>
+            )
+          )}
+        </div>
+      )}
+
       <div className="space-y-1.5">
-        <Label htmlFor="order-detail">Detalle</Label>
+        <Label htmlFor="order-detail">{turn ? "Nota" : "Detalle"}</Label>
         <Textarea
           id="order-detail"
           value={detail}
           onChange={(e) => setDetail(e.target.value)}
-          placeholder="Ej: 10 centros de mesa"
+          placeholder={turn ? "Opcional. Ej: trae foto del color" : "Ej: 10 centros de mesa"}
           maxLength={500}
           className="text-base"
-          required
+          required={!turn}
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="order-amount">Monto</Label>
-          <MoneyInput id="order-amount" value={amount} onChange={setAmount} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="order-date">Fecha de entrega</Label>
-          <Input
-            id="order-date"
-            type="date"
-            value={deliveryDate}
-            onChange={(e) => setDeliveryDate(e.target.value)}
-            className="h-11 text-base"
-            required
+          <Label htmlFor="order-amount">{turn ? "Precio" : "Monto"}</Label>
+          <MoneyInput
+            id="order-amount"
+            value={amount}
+            onChange={(v) => {
+              setAmountTouched(true);
+              setAmount(v);
+            }}
           />
+          {turn && !amountTouched && serviceLines.length > 0 && (
+            <p className="text-xs text-muted-foreground">Suma de los servicios; puedes cambiarlo.</p>
+          )}
         </div>
+        {!turn && (
+          <div className="space-y-1.5">
+            <Label htmlFor="order-date">Fecha de entrega</Label>
+            <Input
+              id="order-date"
+              type="date"
+              value={deliveryDate}
+              onChange={(e) => setDeliveryDate(e.target.value)}
+              className="h-11 text-base"
+              required
+            />
+          </div>
+        )}
       </div>
 
+      {!turn && (
       <div className="space-y-1.5">
         <Label>Prioridad</Label>
         <div className="grid grid-cols-3 gap-2">
@@ -292,9 +412,11 @@ export function OrderForm({
           ))}
         </div>
       </div>
+      )}
 
+      {(!turn || materials.length > 0 || lines.length > 0) && (
       <div className="space-y-2">
-        <Label>Materiales</Label>
+        <Label>{turn ? "Materiales que usas (opcional)" : "Materiales"}</Label>
         {lines.map((line, i) => (
           <div key={line.materialId} className="flex items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-sm">{line.name}</span>
@@ -340,6 +462,7 @@ export function OrderForm({
           )
         )}
       </div>
+      )}
 
       {cost > 0 && (
         <div className="space-y-1 rounded-2xl bg-muted/60 p-3 text-sm">
@@ -370,12 +493,12 @@ export function OrderForm({
         </div>
       )}
 
-      <SubmitButton pending={pending} label={order ? "Guardar cambios" : "Agregar pedido"} />
+      <SubmitButton pending={pending} label={order ? "Guardar cambios" : `Agregar ${noun}`} />
       {order && (
         <DeleteButton
           pending={pending}
           confirming={confirmDelete}
-          label="Eliminar pedido"
+          label={`Eliminar ${noun}`}
           confirmLabel="Tocá de nuevo: también borra sus pagos"
           onClick={handleDelete}
         />
@@ -556,6 +679,97 @@ export function MaterialForm({ material, onDone }: { material?: Material; onDone
           pending={pending}
           confirming={confirmDelete}
           label="Eliminar material"
+          confirmLabel="Tocá de nuevo para confirmar"
+          onClick={handleDelete}
+        />
+      )}
+    </form>
+  );
+}
+
+export function ServiceForm({ service, onDone }: { service?: Service; onDone: () => void }) {
+  const [name, setName] = useState(service?.name ?? "");
+  const [price, setPrice] = useState(service ? amountText(service.price) : "");
+  const [duration, setDuration] = useState(service?.duration ? String(service.duration) : "");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const minutes = duration.trim() ? Number(duration) : 0;
+    if (!Number.isInteger(minutes) || minutes < 0) {
+      toast.error("Revisa la duración (en minutos)");
+      return;
+    }
+    startTransition(async () => {
+      const res = await saveService({ name, price: parseAmount(price) ?? 0, duration: minutes }, service?.id);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(service ? "Servicio actualizado" : "Servicio agregado");
+      onDone();
+    });
+  }
+
+  function handleDelete() {
+    if (!service) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    startTransition(async () => {
+      const res = await deleteService(service.id);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Servicio eliminado");
+      onDone();
+    });
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <div className="space-y-1.5">
+        <Label htmlFor="service-name">Nombre</Label>
+        <Input
+          id="service-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ej: Corte"
+          maxLength={60}
+          autoComplete="off"
+          className="h-11 text-base"
+          required
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="service-price">Precio</Label>
+          <MoneyInput id="service-price" value={price} onChange={setPrice} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="service-duration">Duración (min)</Label>
+          <Input
+            id="service-duration"
+            inputMode="numeric"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))}
+            placeholder="Opcional"
+            className="h-11 text-base tabular-nums"
+          />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Los servicios no llevan stock: se eligen al agendar un turno y su precio es lo que le cobras al cliente.
+      </p>
+      <SubmitButton pending={pending} label={service ? "Guardar cambios" : "Agregar servicio"} />
+      {service && (
+        <DeleteButton
+          pending={pending}
+          confirming={confirmDelete}
+          label="Eliminar servicio"
           confirmLabel="Tocá de nuevo para confirmar"
           onClick={handleDelete}
         />

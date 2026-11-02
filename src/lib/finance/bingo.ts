@@ -126,8 +126,13 @@ function deliveryMessage(deliveries: Order[], today: string): Candidate {
   const first = deliveries[0];
   const urgent = first.deliveryDate <= shiftDay(today, 2);
   const others = deliveries.length - 1;
-  const when =
-    first.deliveryDate < today
+  const turn = first.kind === "appointment";
+  const at = first.time ? ` a las ${first.time}` : "";
+  const when = turn
+    ? first.deliveryDate === today
+        ? `hoy tienes turno con ${first.client}${at}`
+        : `el ${formatShortDate(first.deliveryDate)} tienes turno con ${first.client}${at}`
+    : first.deliveryDate < today
       ? `se te pasó la entrega de ${first.client}`
       : first.deliveryDate === today
         ? `hoy entregas el pedido de ${first.client}`
@@ -137,9 +142,9 @@ function deliveryMessage(deliveries: Order[], today: string): Candidate {
     priority: urgent ? 1 : 32,
     tone: urgent ? "alert" : "warn",
     variant: "hello",
-    text: `¡Guau! Olfateé una entrega: ${when}${others > 0 ? ` (y ${others} más esta semana)` : ""}.`,
-    href: "/negocio",
-    cta: "Ver pedidos",
+    text: `¡Guau! Olfateé ${turn ? "un turno" : "una entrega"}: ${when}${others > 0 ? ` (y ${others} más esta semana)` : ""}.`,
+    href: "/negocio?t=calendario",
+    cta: "Ver calendario",
     dismissible: true,
   };
 }

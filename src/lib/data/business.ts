@@ -19,6 +19,7 @@ import {
   type OrderPayment,
   type OrderPriority,
   type OrderStatus,
+  type Service,
 } from "@/lib/finance/business";
 import type { Transaction } from "@/lib/finance/types";
 import { shiftDay } from "@/lib/finance/format";
@@ -30,6 +31,7 @@ export function toOrder(doc: QueryDocumentSnapshot): Order {
   const d = doc.data();
   return {
     id: doc.id,
+    kind: d.kind === "appointment" ? "appointment" : "order",
     clientId: d.clientId ?? null,
     client: d.client ?? "",
     phone: d.phone ?? "",
@@ -37,8 +39,15 @@ export function toOrder(doc: QueryDocumentSnapshot): Order {
     amount: Number(d.amount) || 0,
     priority: (d.priority as OrderPriority) ?? "medium",
     deliveryDate: d.deliveryDate,
+    time: typeof d.time === "string" ? d.time : null,
     status: (d.status as OrderStatus) ?? "taken",
     materials: d.materials ?? [],
+    services: (d.services ?? []).map((s: Partial<Order["services"][number]>) => ({
+      serviceId: s.serviceId ?? "",
+      name: s.name ?? "",
+      price: Number(s.price) || 0,
+      duration: Number(s.duration) || 0,
+    })),
     paid: Number(d.paid) || 0,
     createdAt: millis(doc),
   };
@@ -53,6 +62,16 @@ function toMaterial(doc: QueryDocumentSnapshot): Material {
     unitPrice: Number(d.unitPrice) || 0,
     stock: Number(d.stock) || 0,
     minStock: Number(d.minStock) || 0,
+  };
+}
+
+function toService(doc: QueryDocumentSnapshot): Service {
+  const d = doc.data();
+  return {
+    id: doc.id,
+    name: d.name ?? "",
+    price: Number(d.price) || 0,
+    duration: Number(d.duration) || 0,
   };
 }
 
@@ -144,9 +163,10 @@ async function linkOrphanOrders(uid: string, orders: Order[], clients: Client[])
 /** Todo lo del módulo Mi negocio (`/negocio`). */
 export async function getBusinessData() {
   const { uid } = await verifySession();
-  const [orders, materials, payments, purchases, expenses, clients, settings] = await Promise.all([
+  const [orders, materials, services, payments, purchases, expenses, clients, settings] = await Promise.all([
     userCollection(uid, "orders").get(),
     userCollection(uid, "materials").orderBy("name").get(),
+    userCollection(uid, "services").orderBy("name").get(),
     userCollection(uid, "orderPayments").orderBy("date", "desc").get(),
     userCollection(uid, "materialPurchases").orderBy("date", "desc").get(),
     userCollection(uid, "businessExpenses").orderBy("date", "desc").get(),
@@ -156,6 +176,7 @@ export async function getBusinessData() {
   const data = {
     orders: orders.docs.map(toOrder),
     materials: materials.docs.map(toMaterial),
+    services: services.docs.map(toService),
     payments: payments.docs.map(toPayment),
     purchases: purchases.docs.map(toPurchase),
     expenses: expenses.docs.map(toExpense),

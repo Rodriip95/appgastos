@@ -63,6 +63,13 @@ export function BalanceViewSwitcher({
   );
 }
 
+/**
+ * Los inputs de fecha traen un ancho mínimo propio (sobre todo iOS Safari, que además ignora
+ * `width` sin `appearance-none`): en dos columnas angostas se desbordaban y se pisaban.
+ */
+const DATE_INPUT =
+  "h-9 appearance-none text-sm [&::-webkit-date-and-time-value]:text-left [&::-webkit-datetime-edit]:p-0";
+
 /** Desde/hasta del período, con atajos para los rangos más comunes. */
 export function PeriodPicker({
   from,
@@ -94,13 +101,25 @@ export function PeriodPicker({
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        <label className="space-y-1 text-xs text-muted-foreground">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
           Desde
-          <Input type="date" value={from} max={to} onChange={(e) => go(e.target.value, to)} />
+          <Input
+            type="date"
+            value={from}
+            max={to}
+            onChange={(e) => go(e.target.value, to)}
+            className={DATE_INPUT}
+          />
         </label>
-        <label className="space-y-1 text-xs text-muted-foreground">
+        <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
           Hasta
-          <Input type="date" value={to} min={from} onChange={(e) => go(from, e.target.value)} />
+          <Input
+            type="date"
+            value={to}
+            min={from}
+            onChange={(e) => go(from, e.target.value)}
+            className={DATE_INPUT}
+          />
         </label>
       </div>
       <div className="flex justify-center gap-2">

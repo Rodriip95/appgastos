@@ -5,12 +5,14 @@ import { changePct, type MonthSummary } from "@/lib/finance/summary";
 import { cn } from "@/lib/utils";
 
 type Props = {
+  /** Título de la tarjeta (cambia en las vistas general y de período) */
+  label?: string;
   summary: MonthSummary;
   /** Totales del mes anterior, para comparar */
   previous?: { income: number; expense: number; month: string };
   /** Gasto proyectado a fin de mes (solo mes en curso) */
   projection?: number | null;
-  /** Neto apartado para metas este mes (aportes − retiros) */
+  /** Neto apartado para metas en lo que se ve (aportes − retiros) */
   saved?: number;
   /** Botón para registrar un ingreso (va en el total de ingresos) */
   incomeAction?: ReactNode;
@@ -22,6 +24,7 @@ type Props = {
 export const BALANCE_ACTIONS_ID = "balance-actions";
 
 export function BalanceCard({
+  label = "Balance del mes",
   summary,
   previous,
   projection,
@@ -35,10 +38,10 @@ export function BalanceCard({
 
   return (
     <section
-      aria-label="Balance del mes"
+      aria-label={label}
       className="rounded-3xl bg-primary p-5 text-primary-foreground shadow-lg shadow-primary/10"
     >
-      <p className="text-sm text-primary-foreground/60">Balance del mes</p>
+      <p className="text-sm text-primary-foreground/60">{label}</p>
       <p
         className={cn(
           "mt-1 text-4xl font-semibold tracking-tight tabular-nums",

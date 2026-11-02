@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import type { DocumentReference, Query } from "firebase-admin/firestore";
 import { verifySession } from "@/lib/auth/session";
 import { sharedCollection, userCollection } from "@/lib/data/collections";
 import { toSpace } from "@/lib/data/shared";
@@ -26,7 +27,21 @@ export type SharedMonthSummary = {
  * Lo compartido que corresponde al resumen de un mes: de los gastos, solo la parte
  * que me toca (lo que adelanté por otro no es gasto mío); de los objetivos, lo que yo aporté.
  */
-export async function getSharedMonthSummary(month: string): Promise<SharedMonthSummary> {
+export function getSharedMonthSummary(month: string): Promise<SharedMonthSummary> {
+  return sharedSummary((space) => space.collection("entries").where("month", "==", month));
+}
+
+/** Lo mismo para un rango de fechas (`from` null = desde el principio). */
+export function getSharedRangeSummary(from: string | null, to: string): Promise<SharedMonthSummary> {
+  return sharedSummary((space) => {
+    const upTo = space.collection("entries").where("date", "<=", to);
+    return from ? upTo.where("date", ">=", from) : upTo;
+  });
+}
+
+async function sharedSummary(
+  entriesOf: (space: DocumentReference) => Query,
+): Promise<SharedMonthSummary> {
   const { uid } = await verifySession();
   const links = await getSharedLinks();
 
@@ -35,7 +50,7 @@ export async function getSharedMonthSummary(month: string): Promise<SharedMonthS
       const spaceRef = sharedCollection().doc(spaceId);
       const [spaceDoc, entries] = await Promise.all([
         spaceRef.get(),
-        spaceRef.collection("entries").where("month", "==", month).get(),
+        entriesOf(spaceRef).get(),
       ]);
       const out: SharedMonthSummary = { transactions: [], goalMovements: [] };
       if (!spaceDoc.exists) return out;
@@ -48,6 +63,7 @@ export async function getSharedMonthSummary(month: string): Promise<SharedMonthS
         const type = doc.get("type");
         const createdAt = doc.get("createdAt")?.toMillis?.() ?? 0;
         const date: string = doc.get("date");
+        const month: string = doc.get("month");
 
         if (space.kind === "expenses" && type === "expense") {
           const mine = Number(doc.get("split")?.[uid]) || 0;

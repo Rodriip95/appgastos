@@ -44,6 +44,14 @@ export async function getMonthGoalMovements(month: string): Promise<GoalMovement
   return snap.docs.map(toMovement);
 }
 
+/** Aportes y retiros entre dos fechas (`from` null = desde el principio). */
+export async function getRangeGoalMovements(from: string | null, to: string): Promise<GoalMovement[]> {
+  const { uid } = await verifySession();
+  const upTo = userCollection(uid, "goalMovements").where("date", "<=", to);
+  const snap = await (from ? upTo.where("date", ">=", from) : upTo).get();
+  return snap.docs.map(toMovement);
+}
+
 /** Últimos movimientos de todas las metas (historial en /ahorros). */
 export async function getRecentGoalMovements(limit = 60): Promise<GoalMovement[]> {
   const { uid } = await verifySession();

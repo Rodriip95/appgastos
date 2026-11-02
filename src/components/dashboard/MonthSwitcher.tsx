@@ -8,16 +8,22 @@ type Props = {
   currentMonth: string;
   /** Primer mes con movimientos; null si no hay ninguno */
   firstMonth: string | null;
+  /** Meses posteriores al actual con movimientos, en orden */
+  futureMonths: string[];
 };
 
 const hrefFor = (month: string, currentMonth: string) =>
-  month === currentMonth ? "/" : `/?m=${month}`;
+  month === currentMonth ? "/?v=mes" : `/?m=${month}`;
 
-export function MonthSwitcher({ month, currentMonth, firstMonth }: Props) {
-  const prev = shiftMonth(month, -1);
-  const next = shiftMonth(month, 1);
-  const canPrev = firstMonth !== null && prev >= firstMonth;
-  const canNext = month < currentMonth;
+export function MonthSwitcher({ month, currentMonth, firstMonth, futureMonths }: Props) {
+  // Hacia adelante del mes actual solo se pasa por meses con movimientos.
+  const isFuture = month > currentMonth;
+  const prev = isFuture
+    ? (futureMonths.findLast((m) => m < month) ?? currentMonth)
+    : shiftMonth(month, -1);
+  const next =
+    month < currentMonth ? shiftMonth(month, 1) : futureMonths.find((m) => m > month);
+  const canPrev = isFuture || (firstMonth !== null && prev >= firstMonth);
   const isCurrent = month === currentMonth;
 
   return (
@@ -28,18 +34,18 @@ export function MonthSwitcher({ month, currentMonth, firstMonth }: Props) {
         </ArrowLink>
         <div className="text-center">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            {isCurrent ? "Este mes" : "Historial"}
+            {isCurrent ? "Este mes" : isFuture ? "Próximo" : "Historial"}
           </p>
           <h1 className="text-xl font-semibold tracking-tight">{formatMonth(month)}</h1>
         </div>
-        <ArrowLink href={hrefFor(next, currentMonth)} enabled={canNext} label="Mes siguiente">
+        <ArrowLink href={next ? hrefFor(next, currentMonth) : "/?v=mes"} enabled={!!next} label="Mes siguiente">
           <ChevronRight />
         </ArrowLink>
       </nav>
       {!isCurrent && (
         <div className="flex justify-center">
           <Link
-            href="/"
+            href="/?v=mes"
             className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground transition hover:text-foreground"
           >
             <RotateCcw className="size-3" /> Volver a {formatMonthShort(currentMonth)}

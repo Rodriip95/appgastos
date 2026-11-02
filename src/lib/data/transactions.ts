@@ -34,11 +34,32 @@ export async function getMonthTransactions(month: string): Promise<Transaction[]
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 }
 
+/** Movimientos entre dos fechas (`from` null = desde el principio), del más reciente al más antiguo. */
+export async function getRangeTransactions(from: string | null, to: string): Promise<Transaction[]> {
+  const { uid } = await verifySession();
+  // Rango sobre un solo campo: no requiere índice compuesto.
+  const upTo = userCollection(uid, "transactions").where("date", "<=", to);
+  const snap = await (from ? upTo.where("date", ">=", from) : upTo).get();
+  return snap.docs
+    .map(toTransaction)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+}
+
 /** Primer mes con movimientos (límite para navegar hacia atrás). */
 export async function getFirstActivityMonth(): Promise<string | null> {
   const { uid } = await verifySession();
   const snap = await userCollection(uid, "transactions").orderBy("month").limit(1).get();
   return snap.empty ? null : (snap.docs[0].get("month") as string);
+}
+
+/** Meses posteriores a `month` con algún movimiento, en orden (ingresos cargados por adelantado, cuotas). */
+export async function getFutureMonths(month: string): Promise<string[]> {
+  const { uid } = await verifySession();
+  const snap = await userCollection(uid, "transactions")
+    .where("month", ">", month)
+    .select("month")
+    .get();
+  return [...new Set(snap.docs.map((d) => d.get("month") as string))].sort();
 }
 
 /** Cuotas de tarjeta desde `fromMonth` en adelante (para próximos resúmenes). */

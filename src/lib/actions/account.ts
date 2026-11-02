@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { verifySession } from "@/lib/auth/session";
 import { sharedCollection, userCollection, contactRequestsCollection } from "@/lib/data/collections";
 import { touch } from "@/lib/data/live";
+import { forgetStatementContents } from "@/lib/data/statement-quota";
 import { toSpace } from "@/lib/data/shared";
 import { exitSpace } from "@/lib/data/shared-write";
 import type { ActionResult } from "@/lib/finance/types";
@@ -71,6 +72,8 @@ export async function deleteAllMyData(confirmation: string): Promise<ActionResul
     // Datos personales.
     const db = userCollection(me.uid, "contacts").firestore;
     for (const name of PERSONAL) await db.recursiveDelete(userCollection(me.uid, name));
+    // Resúmenes importados: se borra lo leído, pero el cupo usado del mes se mantiene.
+    await forgetStatementContents(me.uid);
   } catch (error) {
     console.error("[account] reset:", error);
     return { ok: false, error: "No pudimos borrar todo. Vuelve a intentarlo" };

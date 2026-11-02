@@ -121,3 +121,21 @@ export function activePurchases(cardId: string, upcoming: Transaction[]): CardPu
     };
   });
 }
+
+/**
+ * Cuotas que quedan de una compra leída de un resumen: la cuota `n` de `total`
+ * cae en el resumen que vence en `month` y las siguientes en los meses que siguen.
+ * Las cuotas anteriores ya se pagaron y no se cargan.
+ */
+export function remainingInstallments(
+  card: Pick<CreditCard, "dueDay">,
+  month: string,
+  perInstallment: number,
+  n: number,
+  total: number,
+): Installment[] {
+  return Array.from({ length: total - n + 1 }, (_, i) => {
+    const m = shiftMonth(month, i);
+    return { n: n + i, total, date: dayInMonth(m, card.dueDay), month: m, amount: perInstallment };
+  });
+}

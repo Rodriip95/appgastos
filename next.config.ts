@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Resúmenes de tarjeta (PDF/imagen) que se leen con IA: hasta 4 MB + margen del multipart.
+    serverActions: { bodySizeLimit: "5mb" },
+  },
   // Permite que el popup de Google se comunique con la ventana (evita el aviso COOP)
   async headers() {
     return [

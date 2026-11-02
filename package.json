@@ -10,6 +10,7 @@
     "brand:export": "node scripts/export-brand.cjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.0",
     "firebase": "^13.1.0",

@@ -2,15 +2,23 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Inbox, Search, SearchX, X } from "lucide-react";
+import { ChevronRight, Inbox, Search, SearchX, X } from "lucide-react";
+import { CategoryIcon } from "@/components/categories/CategoryIcon";
 import { ShowMoreButton } from "@/components/common/CollapsibleList";
 import { TransactionRow } from "@/components/transactions/TransactionSheet";
-import { formatDayLabel, formatMoney } from "@/lib/finance/format";
-import type { Category, Transaction } from "@/lib/finance/types";
+import { cardOf, statementKey, statementTotal } from "@/lib/finance/cards";
+import { formatTotals } from "@/lib/finance/currency";
+import { formatDayLabel, formatMoney, formatMonthShort } from "@/lib/finance/format";
+import type { Category, CreditCard, Transaction } from "@/lib/finance/types";
+import { cn } from "@/lib/utils";
 
 type Props = {
   transactions: Transaction[];
   categories: Category[];
+  /** Los consumos de cada tarjeta se muestran juntos, en una fila por resumen */
+  cards: CreditCard[];
+  /** Resúmenes pagados (`cardId:YYYY-MM`); los demás se ven pero no suman */
+  paidStatements: string[];
   /** Qué se está viendo, para el estado vacío: "Octubre", "este período"… */
   scopeLabel: string;
   today: string;
@@ -22,6 +30,11 @@ type Props = {
 
 const DAYS_STEP = 7;
 
+/** Lo que se lista en un día: un movimiento o el resumen de una tarjeta con sus consumos. */
+type Entry =
+  | { kind: "tx"; tx: Transaction }
+  | { kind: "card"; key: string; card: CreditCard; month: string; items: Transaction[]; paid: boolean };
+
 const normalize = (s: string) =>
   s
     .normalize("NFD")
@@ -31,6 +44,8 @@ const normalize = (s: string) =>
 export function TransactionList({
   transactions,
   categories,
+  cards,
+  paidStatements,
   scopeLabel,
   today,
   filterKey,
@@ -61,17 +76,36 @@ export function TransactionList({
 
   // Busca en descripción, categoría y subcategoría, sin importar tildes ni mayúsculas.
   const q = normalize(query.trim());
+  const paidSet = new Set(paidStatements);
   const visible = transactions.filter((t) => {
     const c = categoryOf(t);
-    if (filterKey && (c?.id ?? "none") !== filterKey) return false;
+    const card = cardOf(t, cards);
+    // En "¿En qué se fue?" las tarjetas van aparte: el filtro por categoría no las incluye.
+    if (filterKey && (card || (c?.id ?? "none") !== filterKey)) return false;
     if (!q) return true;
     const sub = c?.subcategories.find((s) => s.id === t.subcategoryId)?.name ?? "";
-    return normalize(`${t.note} ${c?.name ?? ""} ${sub}`).includes(q);
+    return normalize(`${t.alias} ${t.note} ${c?.name ?? ""} ${sub} ${card?.name ?? ""}`).includes(q);
   });
 
   const searching = Boolean(q) || Boolean(filterKey);
-  const days = new Map<string, Transaction[]>();
-  for (const tx of visible) days.set(tx.date, [...(days.get(tx.date) ?? []), tx]);
+  // Por día, los consumos de cada tarjeta se juntan en una sola fila (el resumen de ese mes).
+  const days = new Map<string, Entry[]>();
+  for (const tx of visible) {
+    const entries = days.get(tx.date) ?? [];
+    const card = cardOf(tx, cards);
+    if (card) {
+      const key = statementKey(card.id, tx.month);
+      const group = entries.find((e) => e.kind === "card" && e.key === key);
+      if (group?.kind === "card") group.items.push(tx);
+      else entries.push({ kind: "card", key, card, month: tx.month, items: [tx], paid: paidSet.has(key) });
+    } else {
+      entries.push({ kind: "tx", tx });
+    }
+    days.set(tx.date, entries);
+  }
+  const rowCount = [...days.values()].reduce((n, entries) => n + entries.length, 0);
+  const itemsOf = (entries: Entry[]) =>
+    entries.flatMap((e) => (e.kind === "tx" ? [e.tx] : e.paid ? e.items : []));
 
   return (
     <section id="movimientos" className="scroll-mt-20 space-y-4" aria-label="Movimientos">
@@ -79,7 +113,7 @@ export function TransactionList({
         <div className="flex items-baseline justify-between gap-2">
           <h2 className="font-semibold">Movimientos</h2>
           <span className="text-xs text-muted-foreground tabular-nums">
-            {visible.length} de {transactions.length}
+            {visible.length === transactions.length ? rowCount : `${rowCount} de ${transactions.length}`}
           </span>
         </div>
 
@@ -123,8 +157,9 @@ export function TransactionList({
           No hay movimientos que coincidan.
         </div>
       ) : (
-        [...days].slice(0, searching ? undefined : dayLimit).map(([date, items]) => {
-          // Neto del día por moneda: pesos y dólares no se suman entre sí.
+        [...days].slice(0, searching ? undefined : dayLimit).map(([date, entries]) => {
+          // Neto del día por moneda (pesos y dólares no se suman); un resumen sin pagar no cuenta.
+          const items = itemsOf(entries);
           const netOf = (currency: Transaction["currency"]) =>
             Math.round(
               items
@@ -146,11 +181,17 @@ export function TransactionList({
                 </span>
               </div>
               <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
-                {items.map((tx) => (
-                  <li key={tx.id}>
-                    <TransactionRow transaction={tx} category={categoryOf(tx)} />
-                  </li>
-                ))}
+                {entries.map((e) =>
+                  e.kind === "tx" ? (
+                    <li key={e.tx.id}>
+                      <TransactionRow transaction={e.tx} category={categoryOf(e.tx)} />
+                    </li>
+                  ) : (
+                    <li key={e.key}>
+                      <StatementRow entry={e} />
+                    </li>
+                  ),
+                )}
               </ul>
             </div>
           );
@@ -161,7 +202,7 @@ export function TransactionList({
         <ShowMoreButton
           expanded={false}
           onClick={() => setDayLimit((n) => n + DAYS_STEP)}
-          label={`Ver movimientos anteriores (${[...days].slice(dayLimit).reduce((n, [, items]) => n + items.length, 0)} más)`}
+          label={`Ver movimientos anteriores (${[...days].slice(dayLimit).reduce((n, [, entries]) => n + entries.length, 0)} más)`}
         />
       )}
 
@@ -169,5 +210,38 @@ export function TransactionList({
         Desliza un movimiento a la izquierda para eliminarlo.
       </p>
     </section>
+  );
+}
+
+/** Resumen de una tarjeta en la lista: una sola fila que lleva al detalle de sus consumos. */
+function StatementRow({ entry }: { entry: Extract<Entry, { kind: "card" }> }) {
+  const { card, month, items, paid } = entry;
+  const total = statementTotal(card.id, month, items);
+  const count = items.length === 1 ? "1 consumo" : `${items.length} consumos`;
+  return (
+    <Link
+      href={`/tarjetas/${card.id}?m=${month}`}
+      className="flex w-full items-center gap-3 bg-card px-4 py-3 text-left transition-[background-color] hover:bg-muted/50 active:bg-muted"
+    >
+      <CategoryIcon icon="credit-card" color={card.color} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{card.name}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          Resumen de {formatMonthShort(month)} · {count} ·{" "}
+          <span className={paid ? undefined : "text-amber-600 dark:text-amber-400"}>
+            {paid ? "Pagado" : "Sin pagar, todavía no suma"}
+          </span>
+        </p>
+      </div>
+      <span
+        className={cn(
+          "shrink-0 text-sm font-semibold tabular-nums",
+          !paid && "text-muted-foreground",
+        )}
+      >
+        −{formatTotals(total)}
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+    </Link>
   );
 }

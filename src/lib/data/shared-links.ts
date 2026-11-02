@@ -80,6 +80,7 @@ async function sharedSummary(
             categoryId: link.categoryId,
             subcategoryId: null,
             note: [space.name, sub].filter(Boolean).join(" · "),
+            alias: "",
             recurring: false,
             cardId: null,
             purchaseId: null,

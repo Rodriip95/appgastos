@@ -1,9 +1,12 @@
 import { toArs } from "@/lib/finance/currency";
-import type { Category, Transaction, TxType } from "@/lib/finance/types";
+import type { Category, CreditCard, Transaction, TxType } from "@/lib/finance/types";
 
 export type BreakdownRow = {
+  /** id de la categoría, "none" o `card:<id>` si agrupa los consumos de una tarjeta */
   key: string;
   category: Category | null;
+  /** Tarjeta cuyos consumos agrupa la fila (solo con `groupCards`) */
+  card: Pick<CreditCard, "id" | "name" | "color"> | null;
   total: number;
   /** 0–100 respecto del total del tipo */
   pct: number;
@@ -27,12 +30,19 @@ export type MonthSummary = Totals & {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/**
+ * Con `groupCards`, los gastos con tarjeta van en una fila por tarjeta (con un renglón por
+ * consumo: su alias o, si no tiene, la categoría) en vez de repartirse en las categorías.
+ */
 export function summarizeMonth(
   transactions: Transaction[],
   categories: Category[],
   prevTransactions: Transaction[] = [],
+  { groupCards }: { groupCards?: CreditCard[] } = {},
 ): MonthSummary {
   const byId = new Map(categories.map((c) => [c.id, c]));
+  const cardById = new Map((groupCards ?? []).map((c) => [c.id, c]));
+  const cardOf = (tx: Transaction) => (tx.type === "expense" && tx.cardId && cardById.get(tx.cardId)) || null;
   const totals: Record<TxType, number> = { income: 0, expense: 0 };
   const byCurrency = { ARS: { income: 0, expense: 0 }, USD: { income: 0, expense: 0 } };
   let hasUsd = false;
@@ -45,8 +55,26 @@ export function summarizeMonth(
     if (tx.currency === "USD") hasUsd = true;
 
     const category = (tx.categoryId && byId.get(tx.categoryId)) || null;
+    const card = cardOf(tx);
+    if (card) {
+      const key = `card:${card.id}`;
+      const row = groups.expense.get(key) ?? {
+        key,
+        category: null,
+        card: { id: card.id, name: card.name, color: card.color },
+        total: 0,
+        pct: 0,
+        prevTotal: 0,
+        subs: [],
+      };
+      row.total += value;
+      const cuota = tx.installment && tx.installment.total > 1 ? ` · ${tx.installment.n}/${tx.installment.total}` : "";
+      row.subs.push({ key: tx.id, name: `${tx.alias || category?.name || "Sin categoría"}${cuota}`, total: value });
+      groups.expense.set(key, row);
+      continue;
+    }
     const key = category?.id ?? "none";
-    const row = groups[tx.type].get(key) ?? { key, category, total: 0, pct: 0, prevTotal: 0, subs: [] };
+    const row = groups[tx.type].get(key) ?? { key, category, card: null, total: 0, pct: 0, prevTotal: 0, subs: [] };
     row.total += value;
 
     const subName =
@@ -61,7 +89,10 @@ export function summarizeMonth(
 
   const prevByKey = new Map<string, number>();
   for (const tx of prevTransactions) {
-    const key = `${tx.type}:${(tx.categoryId && byId.has(tx.categoryId) && tx.categoryId) || "none"}`;
+    const card = cardOf(tx);
+    const key = card
+      ? `expense:card:${card.id}`
+      : `${tx.type}:${(tx.categoryId && byId.has(tx.categoryId) && tx.categoryId) || "none"}`;
     prevByKey.set(key, (prevByKey.get(key) ?? 0) + toArs(tx));
   }
 

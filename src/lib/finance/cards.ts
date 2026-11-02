@@ -67,6 +67,30 @@ export function statementTotal(cardId: string, month: string, transactions: Tran
   return sumByCurrency(transactions.filter((t) => t.cardId === cardId && t.month === month));
 }
 
+/** Clave de un resumen: tarjeta + mes en que vence. */
+export const statementKey = (cardId: string, month: string) => `${cardId}:${month}`;
+
+/** Cuota de una tarjeta que existe (las de tarjetas eliminadas se tratan como gastos comunes). */
+export function cardOf<T extends Pick<CreditCard, "id">>(t: Pick<Transaction, "cardId">, cards: T[]): T | null {
+  return (t.cardId && cards.find((c) => c.id === t.cardId)) || null;
+}
+
+/**
+ * Movimientos que cuentan en el balance: una cuota de tarjeta solo cuenta como gasto
+ * cuando el resumen de ese mes está marcado como pagado.
+ */
+export function countedTransactions<T extends Transaction>(
+  list: T[],
+  cards: Pick<CreditCard, "id">[],
+  paid: string[],
+): T[] {
+  const paidSet = new Set(paid);
+  return list.filter((t) => !cardOf(t, cards) || paidSet.has(statementKey(t.cardId!, t.month)));
+}
+
+/** Nombre corto de un consumo: el alias si tiene; si no, la descripción del comercio. */
+export const consumptionLabel = (t: Pick<Transaction, "alias" | "note">) => t.alias || t.note;
+
 export type UpcomingDue = {
   card: CreditCard;
   date: string;
@@ -77,15 +101,17 @@ export type UpcomingDue = {
   usd: number;
 };
 
-/** Vencimientos de los próximos `withinDays` días, del más cercano al más lejano. */
+/** Vencimientos de los próximos `withinDays` días, del más cercano al más lejano. Los pagados no se avisan. */
 export function upcomingDues(
   cards: CreditCard[],
   transactions: Transaction[],
   today: string,
   withinDays = 7,
+  paid: string[] = [],
 ): UpcomingDue[] {
   const limit = shiftDay(today, withinDays);
   return cards
+    .filter((card) => !paid.includes(statementKey(card.id, nextDueDate(card, today).slice(0, 7))))
     .map((card) => {
       const date = nextDueDate(card, today);
       const total = statementTotal(card.id, date.slice(0, 7), transactions);
@@ -98,6 +124,7 @@ export function upcomingDues(
 export type CardPurchase = {
   purchaseId: string;
   note: string;
+  alias: string;
   currency: Currency;
   installments: number;
   /** Cuotas que vencen desde el mes actual en adelante */
@@ -118,6 +145,7 @@ export function activePurchases(cardId: string, upcoming: Transaction[]): CardPu
     return {
       purchaseId,
       note: items[0].note,
+      alias: items[0].alias,
       currency: items[0].currency,
       installments: items[0].installment?.total ?? items.length,
       remaining: items.length,

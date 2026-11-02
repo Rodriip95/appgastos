@@ -83,6 +83,7 @@ export function TransactionForm({
   const [subcategoryId, setSubcategoryId] = useState<string | null>(initial?.subcategoryId ?? null);
   const [date, setDate] = useState(transaction?.date ?? defaultDate);
   const [note, setNote] = useState(initial?.note ?? "");
+  const [alias, setAlias] = useState(transaction?.alias ?? "");
   const [recurring, setRecurring] = useState(initial?.recurring ?? false);
   const [cardId, setCardId] = useState<string | null>(transaction?.cardId ?? null);
   const [installments, setInstallments] = useState(1);
@@ -133,7 +134,7 @@ export function TransactionForm({
     e.preventDefault();
     if (purchaseId) {
       startTransition(async () => {
-        const res = await updateCardPurchase(purchaseId, { categoryId, subcategoryId, note });
+        const res = await updateCardPurchase(purchaseId, { categoryId, subcategoryId, note, alias });
         if (!res.ok) {
           toast.error(res.error);
           return;
@@ -160,6 +161,7 @@ export function TransactionForm({
           categoryId,
           subcategoryId,
           note,
+          alias,
         });
         if (!res.ok) {
           toast.error(res.error);
@@ -320,8 +322,8 @@ export function TransactionForm({
           <CreditCardIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
           <p>
             Cuota {transaction.installment.n} de {transaction.installment.total}
-            {card ? ` con ${card.name}` : ""}. Los cambios de categoría y descripción se aplican a todas
-            las cuotas; para cambiar el monto, elimina la compra y vuelve a cargarla.
+            {card ? ` con ${card.name}` : ""}. Los cambios de categoría, descripción y alias se aplican a
+            todas las cuotas; el monto se corrige desde el detalle de la tarjeta.
           </p>
         </div>
       ) : (
@@ -378,7 +380,8 @@ export function TransactionForm({
                     ? `${installments === 1 ? "Un pago" : `${installments} cuotas`} de ${formatMoney(schedule[0].amount, currency)}. ${
                         installments === 1 ? "Vence" : "La primera vence"
                       } el ${formatShortDate(schedule[0].date)} (cierre día ${card.closingDay}).`
-                    : "Ingresa el monto total de la compra para ver las cuotas."}
+                    : "Ingresa el monto total de la compra para ver las cuotas."}{" "}
+                  Cuenta como gasto cuando marques ese resumen como pagado.
                 </p>
               </div>
             )}
@@ -488,6 +491,25 @@ export function TransactionForm({
           />
         </div>
       </div>
+
+      {(card || purchaseId) && (
+        <div className="space-y-1.5">
+          <Label htmlFor="tx-alias">
+            Alias <span className="font-normal text-muted-foreground">(opcional)</span>
+          </Label>
+          <Input
+            id="tx-alias"
+            value={alias}
+            onChange={(e) => setAlias(e.target.value)}
+            placeholder="Ej: Zapatillas running"
+            maxLength={40}
+            className="h-11 text-base"
+          />
+          <p className="text-xs text-muted-foreground">
+            Un nombre corto para reconocer el consumo cuando el resumen trae el nombre del comercio.
+          </p>
+        </div>
+      )}
 
       {!card && !purchaseId && (
         <label className="flex cursor-pointer items-center gap-3 rounded-2xl border p-3">

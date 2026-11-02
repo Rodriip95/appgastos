@@ -6,6 +6,7 @@ import { DashboardView } from "@/components/dashboard/DashboardView";
 import { verifySession } from "@/lib/auth/session";
 import { getNearOrders } from "@/lib/data/business";
 import { getCards } from "@/lib/data/cards";
+import { getPaidStatements } from "@/lib/data/card-payments";
 import { getCategories } from "@/lib/data/categories";
 import { getGoals, getMonthGoalMovements, getRangeGoalMovements } from "@/lib/data/goals";
 import { getUsdRate } from "@/lib/data/fx";
@@ -63,6 +64,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     range,
     nearOrders,
     usdRate,
+    paidStatements,
   ] = await Promise.all([
     getCategories(),
     getCards(),
@@ -77,6 +79,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
     getRange(view, today),
     getNearOrders(today),
     getUsdRate(),
+    getPaidStatements(),
   ]);
   // Movimientos en dólares sin cotización guardada (la API no respondió al cargarlos): se usa la de hoy.
   const withRate = (list: Transaction[]) => fillRates(list, usdRate?.rate ?? null);
@@ -101,6 +104,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       view={view}
       range={range && { ...range, transactions: withRate(range.transactions) }}
       usdRate={usdRate}
+      paidStatements={paidStatements}
     />
   );
 }

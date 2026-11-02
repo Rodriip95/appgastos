@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChartPie, ChevronDown, ListFilter, TrendingDown, TrendingUp } from "lucide-react";
+import { ChartPie, ChevronDown, CreditCard, ListFilter, TrendingDown, TrendingUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CollapsibleList } from "@/components/common/CollapsibleList";
 import { CATEGORY_COLORS, CategoryIcon } from "@/components/categories/CategoryIcon";
@@ -29,9 +29,11 @@ type Props = {
   summary: MonthSummary;
   /** Arma el link que filtra la lista de movimientos por categoría */
   filterHref: (categoryKey: string) => string;
+  /** Link al detalle de consumos de una tarjeta (filas agrupadas por tarjeta) */
+  cardHref: (cardId: string) => string;
 };
 
-export function Breakdown({ summary, filterHref }: Props) {
+export function Breakdown({ summary, filterHref, cardHref }: Props) {
   return (
     <section className="rounded-3xl border bg-card p-4 sm:p-5">
       <Tabs defaultValue="expense" className="gap-3">
@@ -49,6 +51,7 @@ export function Breakdown({ summary, filterHref }: Props) {
               total={type === "income" ? summary.income : summary.expense}
               type={type}
               filterHref={filterHref}
+              cardHref={cardHref}
             />
           </TabsContent>
         ))}
@@ -85,7 +88,7 @@ function Donut({ rows, total, type }: { rows: BreakdownRow[]; total: number; typ
               strokeWidth="12"
               strokeDasharray={`${Math.max(length - gap, 0)} ${circumference}`}
               strokeDashoffset={-start}
-              className={STROKE[row.category?.color ?? "slate"]}
+              className={STROKE[row.card?.color ?? row.category?.color ?? "slate"]}
             />
           );
         })}
@@ -103,11 +106,13 @@ function Rows({
   total,
   type,
   filterHref,
+  cardHref,
 }: {
   rows: BreakdownRow[];
   total: number;
   type: TxType;
   filterHref: Props["filterHref"];
+  cardHref: Props["cardHref"];
 }) {
   if (rows.length === 0) {
     return (
@@ -127,7 +132,7 @@ function Rows({
         noun="categorías"
       >
         {rows.map((row) => {
-          const color = row.category?.color ?? "slate";
+          const color = row.card?.color ?? row.category?.color ?? "slate";
           const change = changePct(row.total, row.prevTotal);
           // En gastos, subir es malo; en ingresos, bueno.
           const good = change !== null && (type === "income" ? change >= 0 : change <= 0);
@@ -135,11 +140,11 @@ function Rows({
             <li key={row.key}>
               <details className="group">
                 <summary className="flex cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
-                  <CategoryIcon icon={row.category?.icon} color={color} size="sm" />
+                  <CategoryIcon icon={row.card ? "credit-card" : row.category?.icon} color={color} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate text-sm font-medium">
-                        {row.category?.name ?? "Sin categoría"}
+                        {row.card?.name ?? row.category?.name ?? "Sin categoría"}
                       </span>
                       <span className="text-sm font-semibold tabular-nums">{formatMoney(row.total)}</span>
                     </div>
@@ -173,7 +178,7 @@ function Rows({
                       {change}% vs el mes anterior ({formatMoney(row.prevTotal)})
                     </p>
                   )}
-                  {(row.subs.length > 1 || row.subs[0]?.key !== "none") && (
+                  {(row.card || row.subs.length > 1 || row.subs[0]?.key !== "none") && (
                     <ul className="space-y-1.5">
                       {row.subs.map((s) => (
                         <li key={s.key} className="flex justify-between gap-2 text-sm">
@@ -183,13 +188,22 @@ function Rows({
                       ))}
                     </ul>
                   )}
-                  <Link
-                    href={filterHref(row.key)}
-                    scroll={false}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium underline-offset-4 hover:underline"
-                  >
-                    <ListFilter className="size-3.5" /> Ver sus movimientos
-                  </Link>
+                  {row.card ? (
+                    <Link
+                      href={cardHref(row.card.id)}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium underline-offset-4 hover:underline"
+                    >
+                      <CreditCard className="size-3.5" /> Ver consumos de la tarjeta
+                    </Link>
+                  ) : (
+                    <Link
+                      href={filterHref(row.key)}
+                      scroll={false}
+                      className="inline-flex items-center gap-1.5 text-xs font-medium underline-offset-4 hover:underline"
+                    >
+                      <ListFilter className="size-3.5" /> Ver sus movimientos
+                    </Link>
+                  )}
                 </div>
               </details>
             </li>

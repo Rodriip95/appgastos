@@ -37,6 +37,11 @@ export type Transaction = {
   categoryId: string | null;
   subcategoryId: string | null;
   note: string;
+  /**
+   * Alias corto de un consumo con tarjeta ("Zapatillas running") para reconocerlo cuando
+   * la descripción es el nombre del comercio; vacío si no tiene.
+   */
+  alias: string;
   /** Gasto/ingreso fijo: se propone registrarlo cada mes */
   recurring: boolean;
   /** Tarjeta con la que se pagó (solo gastos) */

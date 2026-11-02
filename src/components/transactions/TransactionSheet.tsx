@@ -76,7 +76,7 @@ export function TransactionSheetProvider({
       setState((s) => ({ open: true, type: transaction.type, transaction, key: s.key + 1 })),
   };
 
-  // En el mes actual se propone hoy; en meses pasados, el primer día de ese mes.
+  // En el mes actual se propone hoy; en otros meses, el primer día de ese mes.
   const defaultDate = month === currentMonth ? todayKey() : `${month}-01`;
   const title = state.transaction
     ? "Editar movimiento"

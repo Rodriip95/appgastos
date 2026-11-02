@@ -9,6 +9,7 @@ import { getGoals, getMonthGoalMovements } from "@/lib/data/goals";
 import { getSharedMonthSummary } from "@/lib/data/shared-links";
 import {
   getFirstActivityMonth,
+  getFutureMonths,
   getMonthTransactions,
   getUpcomingCardTransactions,
 } from "@/lib/data/transactions";
@@ -34,8 +35,10 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
   await io(); // "hoy" se calcula en cada request, no en el prerender
   const today = todayKey();
   const currentMonth = today.slice(0, 7);
-  // Solo meses pasados o el actual; cualquier otro valor cae al mes actual.
-  const month = isMonthKey(m) && m <= currentMonth ? m : currentMonth;
+  const futureMonths = await getFutureMonths(currentMonth);
+  // Meses pasados, el actual o uno próximo con movimientos; cualquier otro valor cae al mes actual.
+  const month =
+    isMonthKey(m) && (m <= currentMonth || futureMonths.includes(m)) ? m : currentMonth;
 
   const [
     categories,
@@ -70,6 +73,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/">, "searchParams">)
       prevTransactions={[...prevTransactions, ...prevShared.transactions]}
       upcomingCardTransactions={upcomingCardTransactions}
       firstMonth={firstMonth}
+      futureMonths={futureMonths}
       goals={goals}
       goalMovements={goalMovements}
       month={month}

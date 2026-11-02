@@ -41,6 +41,16 @@ export async function getFirstActivityMonth(): Promise<string | null> {
   return snap.empty ? null : (snap.docs[0].get("month") as string);
 }
 
+/** Meses posteriores a `month` con algún movimiento, en orden (ingresos cargados por adelantado, cuotas). */
+export async function getFutureMonths(month: string): Promise<string[]> {
+  const { uid } = await verifySession();
+  const snap = await userCollection(uid, "transactions")
+    .where("month", ">", month)
+    .select("month")
+    .get();
+  return [...new Set(snap.docs.map((d) => d.get("month") as string))].sort();
+}
+
 /** Cuotas de tarjeta desde `fromMonth` en adelante (para próximos resúmenes). */
 export async function getUpcomingCardTransactions(fromMonth: string): Promise<Transaction[]> {
   const { uid } = await verifySession();

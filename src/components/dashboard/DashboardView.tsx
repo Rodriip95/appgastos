@@ -33,6 +33,8 @@ export type DashboardData = {
   /** Cuotas de tarjeta desde el mes en curso en adelante */
   upcomingCardTransactions: Transaction[];
   firstMonth: string | null;
+  /** Meses posteriores al actual con movimientos */
+  futureMonths: string[];
   goals: Goal[];
   /** Aportes y retiros de metas en el mes que se ve */
   goalMovements: GoalMovement[];
@@ -54,6 +56,7 @@ export function DashboardView({
   prevTransactions,
   upcomingCardTransactions,
   firstMonth,
+  futureMonths,
   goals,
   goalMovements,
   month,
@@ -105,6 +108,7 @@ export function DashboardView({
           month={month}
           currentMonth={currentMonth}
           firstMonth={firstMonth}
+          futureMonths={futureMonths}
         />
 
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:items-start">

@@ -35,6 +35,7 @@ import {
 } from "@/lib/actions/business";
 import type { BalanceView } from "@/lib/finance/balance-view";
 import {
+  BUSINESS_TABS,
   businessMetrics,
   clientStats,
   CONCEPT_LABEL,
@@ -51,6 +52,7 @@ import {
   whatsappHref,
   type BusinessData,
   type BusinessExpense,
+  type BusinessTab,
   type BusinessMetrics,
   type BusinessSettings,
   type Client,
@@ -65,8 +67,6 @@ import { changePct } from "@/lib/finance/summary";
 import type { ActionResult } from "@/lib/finance/types";
 import { cn } from "@/lib/utils";
 
-export const BUSINESS_TABS = ["resumen", "pedidos", "clientes", "stock", "gastos"] as const;
-export type BusinessTab = (typeof BUSINESS_TABS)[number];
 const TAB_LABEL: Record<BusinessTab, string> = {
   resumen: "Resumen",
   pedidos: "Pedidos",

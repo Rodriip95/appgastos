@@ -61,7 +61,7 @@ const ALERTS = [
   { tone: "", text: "Husmeé tu presupuesto de Salidas: ya va el 85%. Te quedan $ 15.000 para lo que falta del mes." },
   { tone: "", text: "Un fijo sin anotar: el alquiler. Es de los que se repiten, ¡no lo dejes para después!" },
   { tone: "happy", text: "¡Estás a un pasito de “Vacaciones”! Te faltan solo $ 40.000. ¡Guau, qué orgullo!" },
-  { tone: "", text: "Olfateé una entrega: el sábado entregás el pedido de Sofi. Y te queda poca harina." },
+  { tone: "", text: "Olfateé una entrega: el sábado entregás el pedido de Flor. Y te queda poca harina." },
 ];
 
 const ORDER_STEPS = [
@@ -257,10 +257,10 @@ export default function WelcomePage() {
                 <BingoMark className={s.boardDog} />
                 <div className={s.columns}>
                   {["Tomado", "En proceso", "Entregado"].map((c) => <div key={c} className={s.column}><h4>{c}</h4></div>)}
-                  <div className={`${s.ticket} ${s.ticketStatic}`} style={vars({ "--c": 0, "--r": 1 })}><b>Velas x12</b><span>Caro · $ 36.000</span></div>
-                  <div className={`${s.ticket} ${s.ticketStatic}`} style={vars({ "--c": 1, "--r": 1 })}><b>Box desayuno</b><span>Martín · $ 28.000</span></div>
-                  <div className={`${s.ticket} ${s.ticketStatic}`} style={vars({ "--c": 2, "--r": 1 })}><b>Cookies x24</b><span>Lu · $ 19.000</span></div>
-                  <div className={`${s.ticket} ${s.ticketMoving}`}><b>Torta de cumple</b><span>Sofi · $ 45.000</span><small>Entrega sáb 14</small></div>
+                  <div className={`${s.ticket} ${s.ticketStatic}`} style={vars({ "--c": 0, "--r": 1 })}><b>Velas x12</b><span>Valen · $ 36.000</span></div>
+                  <div className={`${s.ticket} ${s.ticketStatic}`} style={vars({ "--c": 1, "--r": 1 })}><b>Box desayuno</b><span>Flor · $ 28.000</span></div>
+                  <div className={`${s.ticket} ${s.ticketStatic}`} style={vars({ "--c": 2, "--r": 1 })}><b>Cookies x24</b><span>Valen · $ 19.000</span></div>
+                  <div className={`${s.ticket} ${s.ticketMoving}`}><b>Torta de cumple</b><span>Flor · $ 45.000</span><small>Entrega sáb 14</small></div>
                 </div>
                 <div className={s.metrics}>
                   <div><span>Ganancia del mes</span><b className={s.swap}><i>$ 300.400</i><i>$ 300.400</i><i>$ 345.400</i></b></div>
@@ -420,14 +420,14 @@ function TourMock({ i }: { i: number }) {
   }
   return (
     <div className={s.screen}>
-      <div className={s.screenHead}><b>🏠 Depto con Juli</b><span className={s.avatars}><i>J</i><i>V</i></span></div>
+      <div className={s.screenHead}><b>🏠 Depto con Valen</b><span className={s.avatars}><i>V</i><i>Yo</i></span></div>
       <div className={s.balanceLine}>
         <span>Vos<b>$ 80.000</b></span>
         <span className={s.balanceTrack}><span /></span>
-        <span>Juli<b>$ 180.000</b></span>
+        <span>Valen<b>$ 180.000</b></span>
       </div>
       <div className={s.rows}>
-        <p><span>Expensas · Juli</span><b>$ 180.000</b></p>
+        <p><span>Expensas · Valen</span><b>$ 180.000</b></p>
         <p><span>Súper · Vos</span><b>$ 62.000</b></p>
         <p><span>Internet · Vos</span><b>$ 18.000</b></p>
       </div>

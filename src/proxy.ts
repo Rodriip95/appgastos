@@ -6,13 +6,13 @@ import type { NextRequest } from "next/server";
 // redirige aquí: una cookie vencida/inválida causaría un bucle con la home.
 export function proxy(request: NextRequest) {
   if (!request.cookies.has("session")) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL(request.nextUrl.pathname === "/" ? "/bienvenido" : "/login", request.url));
   }
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/((?!login|api/cron|manifest.webmanifest|sw.js|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
+    "/((?!bienvenido(?:/|$)|login|api/cron|manifest.webmanifest|robots.txt|sitemap.xml|sw.js|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|webp|ico)$).*)",
   ],
 };

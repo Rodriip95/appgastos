@@ -10,3 +10,7 @@ export const USD_REFERENCE = "oficial";
 export const USD_REFERENCE_OPTIONS = ["oficial", "bolsa", "blue"] as const;
 // Consumos en dólares de una tarjeta: si se pagan en pesos, el banco cobra al dólar tarjeta.
 export const USD_CARD_REFERENCE = "tarjeta";
+
+// URL pública (metadatos, sitemap). En Vercel sale sola del dominio de producción.
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL
+  ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");

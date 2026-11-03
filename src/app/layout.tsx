@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fredoka, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/common/ThemeProvider";
+import { SITE_URL } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,6 +23,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Bingo",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
   description: "Bingo cuida tu billetera: registra ingresos y gastos, arma presupuestos y ahorra para tus metas",

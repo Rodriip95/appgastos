@@ -1,12 +1,13 @@
 import type { CSSProperties } from "react";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   BellRing, Calculator, Check, ClipboardList, CreditCard, FileScan, Handshake, Package, PawPrint,
   PiggyBank, ShieldCheck, Smartphone, Sparkles, Tags, Truck, UsersRound, Wallet,
 } from "lucide-react";
-import { BingoDog, BingoMark, BingoWordmark } from "@/components/brand/Bingo";
-import { BoneIcon, LongBingo } from "./LongBingo";
+import { BingoMark, BingoWordmark } from "@/components/brand/Bingo";
+import { ART, BoneIcon, LongBingo } from "./LongBingo";
 import { Motion } from "./motion";
 import s from "./welcome.module.css";
 
@@ -163,7 +164,7 @@ export default function WelcomePage() {
             <span className={`${s.layer} ${s.coin} ${s.coinB}`}>US$</span>
             <span className={`${s.layer} ${s.coin} ${s.coinC}`}>$</span>
             <div className={`${s.layer} ${s.dogLayer}`} style={vars({ "--d": 0.8 })}>
-              <BingoDog variant="wallet" className={s.heroDog} />
+              <Image {...ART.sitting} alt="" unoptimized priority className={s.heroDog} />
             </div>
             <div className={`${s.layer} ${s.chip} ${s.chipA}`} style={vars({ "--d": 1.6 })}>
               <BingoMark className={s.chipAvatar} />
@@ -220,7 +221,7 @@ export default function WelcomePage() {
         <Motion as="section" id="avisos" className={s.alerts}>
           <div className={s.alertsArt} aria-hidden="true">
             <div className={s.alertsSun} />
-            <BingoDog className={s.alertsDog} />
+            <Image {...ART.alert} alt="" unoptimized className={s.alertsDog} />
             <span className={s.bark}>¡Guau!</span>
           </div>
           <div className={s.alertsCopy}>
@@ -312,7 +313,7 @@ export default function WelcomePage() {
           <h2>Grandes planes. Pequeños pasitos.</h2>
           <p>Tu billetera va a estar en buenas patas.</p>
           <Link href="/login" className={s.cta}><GoogleG /> Empezar con Google</Link>
-          <div className={s.peek} aria-hidden="true"><BingoMark className={s.peekHead} /></div>
+          <div className={s.peek} aria-hidden="true"><Image {...ART.peek} alt="" unoptimized className={s.peekHead} /></div>
         </Motion>
       </main>
 

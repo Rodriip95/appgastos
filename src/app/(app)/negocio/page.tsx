@@ -1,12 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { io } from "next/cache";
-import { BusinessView } from "@/components/business/BusinessView";
+import { redirect } from "next/navigation";
+import { BusinessHome } from "@/components/business/BusinessHome";
 import { GoalsSkeleton } from "@/components/goals/GoalsSkeleton";
-import { getBusinessData } from "@/lib/data/business";
-import { resolveBalanceView } from "@/lib/finance/balance-view";
-import { BUSINESS_TABS, type BusinessTab, type DateRange } from "@/lib/finance/business";
-import { isMonthKey, todayKey } from "@/lib/finance/format";
+import { LEGACY_BUSINESS_TABS } from "@/lib/finance/business";
+import { loadBusiness } from "./load";
 
 export const metadata: Metadata = { title: "Mi negocio · Bingo" };
 
@@ -19,31 +17,10 @@ export default function BusinessPage({ searchParams }: PageProps<"/negocio">) {
 }
 
 async function Business({ searchParams }: Pick<PageProps<"/negocio">, "searchParams">) {
-  const data = await getBusinessData();
-  const params = await searchParams;
-  await io(); // "hoy" se calcula en cada request
-  const today = todayKey();
-  const currentMonth = today.slice(0, 7);
+  const { data, params, today, month, view, range, query } = await loadBusiness(searchParams);
+  // Enlaces viejos con pestaña (`?t=stock`): cada sección tiene ahora su pantalla.
+  const legacy = typeof params.t === "string" ? LEGACY_BUSINESS_TABS[params.t] : undefined;
+  if (legacy) redirect(`/negocio/${legacy}${query ? `?${query}` : ""}`);
 
-  // Misma lógica de vistas que la home, pero sin recordar la elección: abre en el mes.
-  const view = resolveBalanceView(params, undefined, today);
-  const month = isMonthKey(params.m) && params.m <= currentMonth ? params.m : currentMonth;
-  const range: DateRange =
-    view.kind === "month"
-      ? { from: `${month}-01`, to: `${month}-31` }
-      : view.kind === "period"
-        ? { from: view.from, to: view.to }
-        : { from: null, to: today };
-  const tab = BUSINESS_TABS.includes(params.t as BusinessTab) ? (params.t as BusinessTab) : "resumen";
-
-  return (
-    <BusinessView
-      {...data}
-      today={today}
-      month={month}
-      view={view}
-      range={range}
-      initialTab={tab}
-    />
-  );
+  return <BusinessHome data={data} today={today} month={month} view={view} range={range} query={query} />;
 }

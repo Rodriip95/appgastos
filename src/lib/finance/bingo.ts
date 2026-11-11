@@ -143,7 +143,7 @@ function deliveryMessage(deliveries: Order[], today: string): Candidate {
     tone: urgent ? "alert" : "warn",
     variant: "hello",
     text: `¡Guau! Olfateé ${turn ? "un turno" : "una entrega"}: ${when}${others > 0 ? ` (y ${others} más esta semana)` : ""}.`,
-    href: "/negocio?t=calendario",
+    href: "/negocio/agenda",
     cta: "Ver calendario",
     dismissible: true,
   };
@@ -170,7 +170,7 @@ export function bingoMessages(ctx: BingoContext, limit = 4): BingoMessage[] {
       tone: "warn",
       variant: "hello",
       text: `Te queda poco de ${first.name} (${first.stock} ${first.unit})${rest.length > 0 ? ` y de ${rest.length} material${rest.length > 1 ? "es" : ""} más` : ""}. ¿Lo reponemos?`,
-      href: "/negocio?t=stock",
+      href: "/negocio/stock",
       cta: "Ver stock",
       dismissible: true,
     });

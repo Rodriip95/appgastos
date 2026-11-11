@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       today,
     );
     if (agenda && (await settings.get()).get("agendaNotifiedFor") !== today) {
-      await sendPush([user.id], { ...agenda, url: "/negocio?t=calendario" });
+      await sendPush([user.id], { ...agenda, url: "/negocio/agenda" });
       await settings.set({ agendaNotifiedFor: today }, { merge: true });
       sent += 1;
     }
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       await sendPush([user.id], {
         title: `Entrega el ${formatShortDate(order.deliveryDate)}`,
         body: `Pedido de ${order.client}: ${order.detail.slice(0, 80)}`,
-        url: "/negocio?t=pedidos",
+        url: "/negocio/pedidos",
       });
       await doc.ref.update({ remindedFor: order.deliveryDate });
       sent += 1;

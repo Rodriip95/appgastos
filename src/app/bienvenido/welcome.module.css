@@ -107,8 +107,8 @@
 }
 .sun { --d: 0.3; inset: 9%; border-radius: 50%; background: var(--peach); }
 .ring { --d: 0.5; inset: 2%; border: 2px dashed #f2a65a; border-radius: 50%; animation: spin 60s linear infinite; }
-.dogLayer { inset: 10% -4% 0 -2%; animation: popIn 1s 0.35s cubic-bezier(0.25, 1.4, 0.45, 1) backwards; }
-.heroDog { display: block; width: 100%; height: auto; rotate: -7deg; transform-origin: 50% 90%; animation: breathe 3.2s ease-in-out infinite; }
+.dogLayer { inset: 8% 8% 1%; display: flex; justify-content: center; animation: popIn 1s 0.35s cubic-bezier(0.25, 1.4, 0.45, 1) backwards; }
+.heroDog { display: block; width: auto; height: 100%; transform-origin: 50% 90%; animation: breathe 3.2s ease-in-out infinite; }
 .boneA, .boneB { width: 64px; color: #f6b26b; animation: bob 4s ease-in-out infinite; }
 .boneA { --d: 1.8; top: 4%; left: 8%; rotate: -25deg; }
 .boneB { --d: 1; bottom: 30%; right: -2%; width: 48px; rotate: 40deg; animation-delay: -1.5s; color: #f2a65a; }
@@ -131,7 +131,7 @@
 }
 .chip p b { display: block; font-size: 15px; }
 .chip > svg { flex-shrink: 0; color: var(--rust); }
-.chipA { top: 10%; right: -4%; rotate: 4deg; animation-delay: 0.9s; }
+.chipA { top: 2%; left: -10%; rotate: -4deg; animation-delay: 0.9s; }
 .chipA p b { display: inline; font-size: inherit; color: var(--rust); }
 .chipB { bottom: 22%; left: -6%; rotate: -5deg; animation-delay: 1.05s; }
 .chipC { bottom: 2%; right: 4%; rotate: 3deg; animation-delay: 1.2s; }
@@ -187,45 +187,33 @@
 .tour[data-step="3"] .panel:nth-child(4),
 .tour[data-step="4"] .panel:nth-child(5) { opacity: 1; translate: 0 0; pointer-events: auto; }
 
+/* Bingo que camina: bingoPerfil.svg espejado y cortado en x = 200 (de 345). --u = 1 unidad del dibujo (250 de alto). */
 .trail {
-  --tail: 80px; --min: 130px; --head: 170px; --h: 66px; --leg: 32px;
-  --range: calc(100% - var(--min) - var(--tail) - var(--head) * 0.75);
-  position: relative; height: 210px;
+  --H: clamp(110px, 20svh, 168px); --u: calc(var(--H) / 250);
+  --rearW: calc(145 * var(--u)); --frontW: calc(200 * var(--u));
+  --range: calc(100% - var(--rearW) - var(--frontW));
+  --mid: calc(var(--p, 0) * var(--range));
+  position: relative; height: calc(var(--H) + 44px);
 }
-.trail::before { content: ""; position: absolute; inset: auto 0 44px; height: 3px; border-radius: 3px; background: rgb(101 51 36 / 0.16); }
-.longDog { position: absolute; inset: 0 0 46px; }
-.body {
-  position: absolute; z-index: 1; left: var(--tail); bottom: var(--leg);
-  width: calc(var(--min) + var(--p, 0) * var(--range)); height: var(--h);
-  border: 3.5px solid var(--line); border-radius: 999px;
-  background: var(--fur); box-shadow: inset 0 calc(var(--h) * -0.3) 0 var(--belly), inset 0 6px 0 #e99b62;
-}
-.tail { position: absolute; z-index: 0; left: 6px; bottom: calc(var(--leg) + var(--h) - 30px); width: 80px; transform-origin: 92% 70%; animation: wag 0.45s ease-in-out infinite alternate; }
-.leg {
-  position: absolute; z-index: 0; bottom: 0;
-  width: 22px; height: calc(var(--leg) + 18px);
-  border: 3.5px solid var(--line); border-radius: 6px 6px 10px 10px; background: var(--fur);
-  transform-origin: 50% 10%;
-  rotate: calc(sin(var(--p, 0) * 140rad) * 24deg);
-}
-.leg::after { content: ""; position: absolute; left: -8px; bottom: -4px; width: 30px; height: 12px; border: 3.5px solid var(--line); border-radius: 999px; background: #f9d5a0; }
-.legAlt { z-index: -1; background: #c96f3a; rotate: calc(sin(var(--p, 0) * 140rad) * -24deg); }
-.legAlt::after { background: #e8b884; }
-.legBack { left: calc(var(--tail) + 20px); }
-.legBack.legAlt { left: calc(var(--tail) + 40px); }
-.legFront { left: calc(var(--tail) + var(--min) + var(--p, 0) * var(--range) - 64px); }
-.legFront.legAlt { left: calc(var(--tail) + var(--min) + var(--p, 0) * var(--range) - 44px); }
-.head {
-  position: absolute; z-index: 2;
-  left: calc(var(--tail) + var(--min) + var(--p, 0) * var(--range) - var(--head) * 0.33);
-  bottom: calc(var(--leg) + var(--h) * 0.2);
-  width: var(--head); height: auto;
-  transform-origin: 20% 90%; animation: nod 2.4s ease-in-out infinite;
+.trail::before { content: ""; position: absolute; inset: auto 0 41px; height: 3px; border-radius: 3px; background: rgb(101 51 36 / 0.16); }
+.longDog { position: absolute; inset: auto 0 40px; height: var(--H); }
+.rear, .front { position: absolute; bottom: 0; height: var(--H); overflow: hidden; }
+.rear { left: 0; width: var(--rearW); }
+.front { left: calc(var(--rearW) + var(--mid)); width: var(--frontW); }
+.walkArt { position: absolute; top: 0; height: 100%; width: calc(345 * var(--u)); max-width: none; transform: scaleX(-1); }
+.front .walkArt { left: calc(-145 * var(--u)); }
+.rear .walkArt { left: 0; }
+/* El tramo repite el corte: lomo en y = 124.13, panza en y = 205.13, trazo de 3 unidades. */
+.middle {
+  position: absolute; box-sizing: border-box;
+  left: calc(var(--rearW) - 1px); width: calc(var(--mid) + 2px);
+  top: calc(124.13 * var(--u)); height: calc(84 * var(--u));
+  border-block: calc(3 * var(--u)) solid #653324; background: #df8b50;
 }
 .stops { position: absolute; inset: auto 0 0; height: 40px; }
 .stop {
   position: absolute; bottom: 0;
-  left: calc(var(--tail) + var(--min) + var(--i) / 5 * var(--range) + var(--head) * 0.12);
+  left: calc(var(--rearW) + var(--i) / 5 * var(--range) + 105 * var(--u));
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   translate: -50% 0;
   font-size: 13px; font-weight: 600; color: var(--muted);
@@ -327,7 +315,7 @@
 }
 .alertsArt { position: relative; aspect-ratio: 1; }
 .alertsSun { position: absolute; inset: 8%; border-radius: 50%; background: var(--sand); translate: 0 calc((var(--p, 0.5) - 0.5) * 80px); }
-.alertsDog { position: absolute; inset: 0; width: 100%; height: auto; translate: 0 calc((var(--p, 0.5) - 0.5) * -120px); rotate: calc((var(--p, 0.5) - 0.5) * 16deg); }
+.alertsDog { position: absolute; inset: 8% 0 0; margin: auto; width: auto; height: 90%; scale: -1 1; translate: 0 calc((var(--p, 0.5) - 0.5) * -120px); rotate: calc((var(--p, 0.5) - 0.5) * 16deg); }
 .bark {
   position: absolute; top: 2%; right: 2%;
   padding: 10px 22px; border-radius: 26px 26px 26px 4px;
@@ -471,8 +459,9 @@
 }
 .final > p { margin: 26px 0 30px; font-size: 19px; font-weight: 550; }
 .final .cta { box-shadow: 0 6px 0 var(--line); }
-.peek { height: 190px; margin-top: 30px; }
-.peekHead { display: block; margin: auto; width: 260px; height: auto; translate: 0 clamp(0px, (0.42 - var(--p, 0.42)) * 600px, 160px); transition: translate 0.15s linear; }
+.peek { position: relative; height: 190px; margin-top: 30px; }
+.peek::before { content: ""; position: absolute; left: 50%; bottom: -200px; width: 380px; aspect-ratio: 1; translate: -50% 0; border-radius: 50%; background: var(--peach); }
+.peekHead { position: relative; display: block; margin: auto; width: 300px; height: auto; translate: 0 clamp(0px, (0.42 - var(--p, 0.42)) * 600px, 160px); transition: translate 0.15s linear; }
 .footer {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
   padding: 28px max(24px, calc((100% - 1240px) / 2)) 36px;
@@ -509,17 +498,7 @@
   .mock { max-width: 340px; align-self: start; }
   .screen { padding: 14px; gap: 10px; font-size: 12px; border-radius: 22px; }
   .donut { width: 96px; }
-  .trail { --tail: 46px; --min: 70px; --head: 96px; --h: 40px; --leg: 20px; height: 138px; }
-  .trail::before { bottom: 40px; }
-  .longDog { bottom: 42px; }
-  .tail { width: 52px; bottom: calc(var(--leg) + var(--h) - 20px); }
-  .leg { width: 15px; border-width: 3px; }
-  .leg::after { left: -6px; width: 22px; height: 9px; border-width: 3px; }
-  .legBack { left: calc(var(--tail) + 12px); }
-  .legBack.legAlt { left: calc(var(--tail) + 26px); }
-  .legFront { left: calc(var(--tail) + var(--min) + var(--p, 0) * var(--range) - 42px); }
-  .legFront.legAlt { left: calc(var(--tail) + var(--min) + var(--p, 0) * var(--range) - 28px); }
-  .body { border-width: 3px; }
+  .trail { --H: clamp(84px, 13svh, 104px); }
   .stop { font-size: 11px; }
   /* No entran todos los nombres: solo se ve el de la parada actual */
   .stop span { opacity: 0; transition: opacity 0.3s; }
@@ -572,7 +551,7 @@
   .lead { font-size: 16px; }
   .cta, .ghost { width: 100%; }
   .chip { max-width: 200px; padding: 10px 12px; font-size: 12px; }
-  .chipA { right: -2%; }
+  .chipA { left: -2%; }
   .chipB { left: -2%; }
   .coin { width: 44px; height: 44px; font-size: 16px; }
   .coinB { width: 52px; height: 52px; font-size: 13px; }
@@ -597,7 +576,6 @@
 @media (prefers-reduced-motion: reduce) {
   .page *, .page *::before, .page *::after { animation: none !important; transition: none !important; }
   .layer, .alertsSun, .alertsDog { translate: none !important; }
-  .leg { rotate: 0deg !important; }
   .alerts[data-in="false"] .bubble, .steps[data-in="false"] .stepList li { opacity: 1; translate: none; }
   .paws svg { opacity: 1; }
   .peekHead { translate: none; }
